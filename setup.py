@@ -12,7 +12,7 @@ install_requires = [
     'Django',
     'django-extensions',
     'django-nose',
-    'lizard-ui >= 4.0b5',
+    'tslib',
     ],
 
 tests_require = [
