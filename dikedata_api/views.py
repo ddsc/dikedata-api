@@ -1,21 +1,51 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from django.conf import settings
+from django.http import HttpResponse
+from django.utils import simplejson
 from django.utils.translation import ugettext as _
-# from django.core.urlresolvers import reverse
-# from lizard_map.views import MapView
-# from lizard_ui.views import UiView
+from lizard_ui.views import UiView
+from tslib.readers import CassandraReader
 
-# from dikedata_api import models
-
-
-# class TodoView(UiView):
-#     """Simple view without a map."""
-#     template_name = 'dikedata_api/todo.html'
-#     page_title = _('TODO view')
+import pytz
 
 
-# class Todo2View(MapView):
-#     """Simple view with a map."""
-#     template_name = 'dikedata_api/todo2.html'
-#     page_title = _('TODO 2 view')
+def api_response(request):
+    SERVERS = settings.CASSANDRA['servers']
+    KEYSPACE = settings.CASSANDRA['keyspace']
+    COL_FAM = settings.CASSANDRA['column_family']
+    COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+    tz = pytz.UTC
+    
+    reader = CassandraReader(SERVERS, KEYSPACE, COL_FAM)
+    
+    out = []
+    params = request.GET.keys()
+    if 'location_id' in params:
+        location_id = request.GET.get('location_id')
+        if 'start' in params:
+            start = datetime.strptime(request.GET.get('start'), COLNAME_FORMAT)
+        else:
+            start = datetime.now() + relativedelta( years = -3 )
+        if 'end' in params:
+            end = datetime.strptime(request.GET.get('end'), COLNAME_FORMAT)
+        else:
+            end = datetime.now()
+        filter = ['value', 'flag']
+
+        df = reader.read(location_id, tz.localize(start), tz.localize(end),
+                         params=filter)
+        
+        out = [
+            dict([('timestamp', timestamp)] + [
+                (colname, row[i])
+                for i, colname in enumerate(df.columns)
+            ])
+            for timestamp, row in df.iterrows()
+        ]
+
+    return HttpResponse(simplejson.dumps(out, indent=4),
+                        mimetype='application/json')
