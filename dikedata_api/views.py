@@ -8,7 +8,8 @@ from django.http import HttpResponse
 from django.utils import simplejson
 from django.utils.translation import ugettext as _
 from lizard_ui.views import UiView
-from tslib.readers import CassandraReader
+from models import CassandraDataStore
+from models import RabbitMQ
 
 import pytz
 
@@ -20,32 +21,57 @@ def api_response(request):
     COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
     tz = pytz.UTC
     
-    reader = CassandraReader(SERVERS, KEYSPACE, COL_FAM)
+    reader = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM)
     
-    out = []
+    out = {}
     params = request.GET.keys()
-    if 'location_id' in params:
-        location_id = request.GET.get('location_id')
-        if 'start' in params:
-            start = datetime.strptime(request.GET.get('start'), COLNAME_FORMAT)
-        else:
-            start = datetime.now() + relativedelta( years = -3 )
-        if 'end' in params:
-            end = datetime.strptime(request.GET.get('end'), COLNAME_FORMAT)
-        else:
-            end = datetime.now()
-        filter = ['value', 'flag']
+    try:
+        if 'location_id' in params:
+            location_id = request.GET.get('location_id')
+            if 'start' in params:
+                start = datetime.strptime(request.GET.get('start'), COLNAME_FORMAT)
+            else:
+                start = datetime.now() + relativedelta( years = -3 )
+            if 'end' in params:
+                end = datetime.strptime(request.GET.get('end'), COLNAME_FORMAT)
+            else:
+                end = datetime.now()
+            filter = ['value', 'flag']
+    
+            df = reader.read(location_id, tz.localize(start), tz.localize(end),
+                             params=filter)
+            
+            out = [
+                dict([('datetime', timestamp)] + [
+                    (colname, row[i])
+                    for i, colname in enumerate(df.columns)
+                ])
+                for timestamp, row in df.iterrows()
+            ]
+    except Exception as ex:
+        out = {'errors': ex.args }
 
-        df = reader.read(location_id, tz.localize(start), tz.localize(end),
-                         params=filter)
-        
-        out = [
-            dict([('timestamp', timestamp)] + [
-                (colname, row[i])
-                for i, colname in enumerate(df.columns)
-            ])
-            for timestamp, row in df.iterrows()
-        ]
+
+    return HttpResponse(simplejson.dumps(out, indent=4),
+                        mimetype='application/json')
+
+def api_write(request):
+    out = {'result' : 1}
+    params = request.GET.keys()
+    try:
+        if 'location_id' in params:
+            location_id = request.GET.get('location_id')
+            rabbit = RabbitMQ(settings.RABBITMQ['server'],
+                settings.RABBITMQ['user'], settings.RABBITMQ['password'],
+                settings.RABBITMQ['vhost'])
+            msg = {
+                "location_id" : location_id
+            }
+            rabbit.send(msg, b"timeseries", b"store")
+            out = {'result' : 0, 'msg' : msg}
+    except Exception as ex:
+        out = {'result' : 1, 'errors' : ex.args}
+
 
     return HttpResponse(simplejson.dumps(out, indent=4),
                         mimetype='application/json')

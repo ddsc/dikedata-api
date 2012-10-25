@@ -12,5 +12,6 @@ admin.autodiscover()
 urlpatterns = patterns(
     '',
     url(r'^read/', views.api_response),
+    url(r'^write/', views.api_write),
     )
 urlpatterns += debugmode_urlpatterns()

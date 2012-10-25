@@ -12,6 +12,7 @@ install_requires = [
     'Django',
     'django-extensions',
     'django-nose',
+    'pika',
     'tslib',
     ],
 
