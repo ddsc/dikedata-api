@@ -61,10 +61,11 @@ def bucket_start(timestamp, bucketsize):
 
 class CassandraDataStore:
 
-    def __init__(self, nodes, keyspace, column_family):
+    def __init__(self, nodes, keyspace, column_family, queue_size):
         pool = pycassa.ConnectionPool(keyspace=keyspace, server_list=nodes,
             prefill=False)
         self.cf = pycassa.ColumnFamily(pool, column_family)
+        self.qs = queue_size
 
     def read(self, sensor_id, start, end, params=[]):
         assert start.tzinfo != None, "Start datetime must be timezone aware"
@@ -121,21 +122,18 @@ class CassandraDataStore:
         # And create the Pandas DataFrame.
         return pd.DataFrame(data=data, index=sorted(datetimes))
 
-    def write(self, dataframes):
+    def write(self, sensor_id, df):
+        bucket = bucket_size(sensor_id)
         key_format = bucket_format(bucket)
-        i = 0
         with self.cf.batch(queue_size=self.qs) as b:
-            for df in dataframes:
-                sensor_id = 'pixml-test-%d' % i
-                for timestamp, row in df.iterrows():
-                    ts_int = timestamp.astimezone(INTERNAL_TIMEZONE)
-                    b.insert(
-                        ts_int.strftime(sensor_id + ':' + key_format),
-                        dict(("%s%s%s" % (ts_int.strftime(COLNAME_FORMAT),
-                            COLNAME_SEPERATOR, k), str(v))
-                            for k, v in row.to_dict().iteritems())
-                    )
-                i += 1
+            for timestamp, row in df.T.iteritems():
+                ts_int = timestamp.astimezone(INTERNAL_TIMEZONE)
+                b.insert(
+                    ts_int.strftime(sensor_id + ':' + key_format),
+                    dict(("%s%s%s" % (ts_int.strftime(COLNAME_FORMAT),
+                        COLNAME_SEPERATOR, k), str(v))
+                        for k, v in row.to_dict().iteritems())
+                )
 
 class RabbitMQ:
 

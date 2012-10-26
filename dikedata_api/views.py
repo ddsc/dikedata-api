@@ -21,7 +21,7 @@ def api_response(request):
     COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
     tz = pytz.UTC
     
-    reader = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM)
+    reader = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM, 10000)
     
     out = {}
     params = request.GET.keys()
