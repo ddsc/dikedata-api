@@ -126,7 +126,7 @@ class CassandraDataStore:
         bucket = bucket_size(sensor_id)
         key_format = bucket_format(bucket)
         with self.cf.batch(queue_size=self.qs) as b:
-            for timestamp, row in df.T.iteritems():
+            for timestamp, row in df.iterrows():
                 ts_int = timestamp.astimezone(INTERNAL_TIMEZONE)
                 b.insert(
                     ts_int.strftime(sensor_id + ':' + key_format),
@@ -145,7 +145,11 @@ class RabbitMQ:
         self.channel = conn_broker.channel()
 
     def send(self, msg, exchange, routing_key):
-        self.channel.exchange_declare(exchange=exchange, type=b"direct",
+        queue = b"%s_%s" % (exchange, routing_key)
+        ch = self.channel
+        ch.exchange_declare(exchange=exchange, type=b"direct",
             auto_delete=False)
-        self.channel.basic_publish(body = simplejson.dumps(msg),
+        ch.queue_declare(queue=queue)
+        ch.queue_bind(queue=queue, exchange=exchange, routing_key=routing_key)
+        ch.basic_publish(body = simplejson.dumps(msg),
             exchange = exchange, routing_key=routing_key)

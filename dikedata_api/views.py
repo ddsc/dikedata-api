@@ -24,10 +24,11 @@ def api_response(request):
     reader = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM, 10000)
     
     out = {}
+    print request
     params = request.GET.keys()
     try:
-        if 'location_id' in params:
-            location_id = request.GET.get('location_id')
+        if 'observer' in params:
+            observer_id = request.GET.get('observer')
             if 'start' in params:
                 start = datetime.strptime(request.GET.get('start'), COLNAME_FORMAT)
             else:
@@ -38,39 +39,41 @@ def api_response(request):
                 end = datetime.now()
             filter = ['value', 'flag']
     
-            df = reader.read(location_id, tz.localize(start), tz.localize(end),
+            df = reader.read(observer_id, tz.localize(start), tz.localize(end),
                              params=filter)
             
-            out = [
+            data = [
                 dict([('datetime', timestamp)] + [
                     (colname, row[i])
                     for i, colname in enumerate(df.columns)
                 ])
                 for timestamp, row in df.iterrows()
             ]
+            out['observers'] = [{'id': observer_id, 'data': data}]
+
     except Exception as ex:
-        out = {'errors': ex.args }
+        out['errors'] = ex.arg
 
 
     return HttpResponse(simplejson.dumps(out, indent=4),
                         mimetype='application/json')
 
 def api_write(request):
-    out = {'result' : 1}
+    out = {}
     params = request.GET.keys()
     try:
-        if 'location_id' in params:
-            location_id = request.GET.get('location_id')
+        if 'observer' in params:
+            observer_id = request.GET.get('observer')
             rabbit = RabbitMQ(settings.RABBITMQ['server'],
                 settings.RABBITMQ['user'], settings.RABBITMQ['password'],
                 settings.RABBITMQ['vhost'])
-            msg = {
-                "location_id" : location_id
-            }
+            dummy = [{"datetime": "2009-03-26T23:00:00Z", "value": "37"},
+                     {"datetime": "2009-03-27T23:00:00Z", "value": "42"}]
+            msg = [{'id': observer_id, 'data': dummy}]
             rabbit.send(msg, b"timeseries", b"store")
-            out = {'result' : 0, 'msg' : msg}
+            out['observers'] = msg
     except Exception as ex:
-        out = {'result' : 1, 'errors' : ex.args}
+        out['errors'] = ex.arg
 
 
     return HttpResponse(simplejson.dumps(out, indent=4),
