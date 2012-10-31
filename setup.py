@@ -12,7 +12,9 @@ install_requires = [
     'Django',
     'django-extensions',
     'django-nose',
+    'cassandralib',
     'pika',
+    'rabbitmqlib',
     'tslib',
     ],
 
