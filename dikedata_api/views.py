@@ -5,13 +5,14 @@ from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
 from django.http import HttpResponse
-from django.utils import simplejson
+from django.utils import simplejson as json
 from django.utils.translation import ugettext as _
 from lizard_ui.views import UiView
-from models import CassandraDataStore
-from models import RabbitMQ
+from cassandralib.models import CassandraDataStore
+from rabbitmqlib.models import Producer
 
 import pytz
+import uuid
 
 
 def api_response(request):
@@ -19,62 +20,62 @@ def api_response(request):
     KEYSPACE = settings.CASSANDRA['keyspace']
     COL_FAM = settings.CASSANDRA['column_family']
     COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-    tz = pytz.UTC
+    INTERNAL_TIMEZONE = pytz.UTC
     
-    reader = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM, 10000)
+    cassandra = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM, 10000)
     
     out = {}
-    print request
-    params = request.GET.keys()
+    get = request.GET.keys()
     try:
-        if 'observer' in params:
-            observer_id = request.GET.get('observer')
+        if 'request' in get:
+            params = json.loads(request.GET.get('request'))
             if 'start' in params:
-                start = datetime.strptime(request.GET.get('start'), COLNAME_FORMAT)
+                start = datetime.strptime(params['start'], COLNAME_FORMAT)
             else:
                 start = datetime.now() + relativedelta( years = -3 )
             if 'end' in params:
-                end = datetime.strptime(request.GET.get('end'), COLNAME_FORMAT)
+                end = datetime.strptime(params['end'], COLNAME_FORMAT)
             else:
                 end = datetime.now()
-            filter = ['value', 'flag']
-    
-            df = reader.read(observer_id, tz.localize(start), tz.localize(end),
-                             params=filter)
+            if "observers" in params:
+                out['observers'] = {}
+                for observer_id in params['observers']:
+                    filter = ['value', 'flag']
             
-            data = [
-                dict([('datetime', timestamp)] + [
-                    (colname, row[i])
-                    for i, colname in enumerate(df.columns)
-                ])
-                for timestamp, row in df.iterrows()
-            ]
-            out['observers'] = [{'id': observer_id, 'data': data}]
+                    df = cassandra.read(observer_id,
+                        INTERNAL_TIMEZONE.localize(start),
+                        INTERNAL_TIMEZONE.localize(end), params=filter)
+                    
+                    data = [
+                        dict([('datetime', timestamp.strftime(COLNAME_FORMAT))] + [
+                            (colname, row[i])
+                            for i, colname in enumerate(df.columns)
+                        ])
+                        for timestamp, row in df.iterrows()
+                    ]
+                    out['observers'][observer_id] = data
 
     except Exception as ex:
         out['errors'] = ex.arg
 
-
-    return HttpResponse(simplejson.dumps(out, indent=4),
-                        mimetype='application/json')
+    return HttpResponse(json.dumps(out, indent=4), mimetype='application/json')
 
 def api_write(request):
     out = {}
-    params = request.GET.keys()
+    get = request.GET.keys()
     try:
-        if 'observer' in params:
-            observer_id = request.GET.get('observer')
-            rabbit = RabbitMQ(settings.RABBITMQ['server'],
-                settings.RABBITMQ['user'], settings.RABBITMQ['password'],
-                settings.RABBITMQ['vhost'])
-            dummy = [{"datetime": "2009-03-26T23:00:00Z", "value": "37"},
-                     {"datetime": "2009-03-27T23:00:00Z", "value": "42"}]
-            msg = [{'id': observer_id, 'data': dummy}]
-            rabbit.send(msg, b"timeseries", b"store")
-            out['observers'] = msg
+        if 'request' in get:
+            params = json.loads(request.GET.get('request'))
+            if 'observers' in params:
+                observers = params['observers']
+                producer = Producer(settings.RABBITMQ['server'],
+                    settings.RABBITMQ['user'], settings.RABBITMQ['password'],
+                    settings.RABBITMQ['vhost'])
+                msg_id = uuid.uuid4()
+                out = {'message_id': str(msg_id), 'observers': observers}
+                producer.send(out, b"timeseries", b"store")
+                out['status'] = 'sent'
     except Exception as ex:
-        out['errors'] = ex.arg
+        out['errors'] = ex.args
 
-
-    return HttpResponse(simplejson.dumps(out, indent=4),
-                        mimetype='application/json')
+    return HttpResponse(json.dumps(out, indent=4), mimetype='application/json')
