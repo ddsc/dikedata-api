@@ -13,9 +13,9 @@ install_requires = [
     'django-extensions',
     'django-nose',
     'cassandralib',
-    'pika',
     'rabbitmqlib',
     'tslib',
+    'uuid',
     ],
 
 tests_require = [
