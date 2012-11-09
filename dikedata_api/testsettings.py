@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.gis',
     'django.contrib.sites',
+    'rest_framework',
     ]
 ROOT_URLCONF = 'dikedata_api.urls'
 

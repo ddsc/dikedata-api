@@ -1,15 +1,20 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
+from dikedata_api.models import Observer
+from dikedata_api.serializers import ObserverSerializer
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from django.conf import settings
-from django.http import HttpResponse
-from django.utils import simplejson as json
+#from django.http import HttpResponse
+#from django.utils import simplejson as json
 from django.utils.translation import ugettext as _
 from lizard_ui.views import UiView
 from cassandralib.models import CassandraDataStore
 from rabbitmqlib.models import Producer
+from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework.views import APIView
 
 import pandas as pd
 import pytz
@@ -22,6 +27,46 @@ COL_FAM = settings.CASSANDRA['column_family']
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 INTERNAL_TIMEZONE = pytz.UTC
 
+class Root(APIView):
+    """
+    The entry endpoint of our API.
+    """
+    def get(self, request, format=None):
+        return Response({
+            'observers': reverse('api:observer-list', request=request),
+        })
+
+class ObserverList(APIView):
+    """
+    API endpoint that represents a list of observers.
+    THIS IS A HARD CODED LIST: TBI
+    """
+    def get(self, request, format=None):
+        """
+        Return a list of all users.
+        """
+        try:
+            observers = dict([(obs.id, reverse('api:observer-detail', request=request,
+                kwargs={'pk':obs.id})) for obs in Observer.objects.all()])
+            return Response(observers)
+        except Exception as ex:
+            return Response({'status':ex.__class__.__name__, 'error': ex.args})
+
+class ObserverDetail(APIView):
+    """
+    API endpoint that represents details of an observers.
+    """
+    def get(self, request, format=None, pk=None):
+        """
+        Return a list of all users.
+        """
+        try:
+            observer = Observer.objects.filter(pk=pk)
+            return Response({pk: observer.data})
+        except Exception as ex:
+            return Response({'status':ex.__class__.__name__, 'error': ex.args})
+
+#deprecated
 def api_response(request):
     cassandra = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM, 10000)
     
@@ -64,6 +109,7 @@ def api_response(request):
 
     return HttpResponse(json.dumps(msg, indent=4), mimetype='application/json')
 
+#deprecated
 def api_write(request):
     msg = {}
     get = request.GET.keys()
