@@ -37,6 +37,16 @@ DATABASES = {
         'PORT': '',  # empty string for default.
         }
     }
+CASSANDRA = {
+    'servers': [
+        '10.100.235.201:9160',
+        '10.100.235.202:9160',
+        '10.100.235.203:9160',
+        '10.100.235.204:9160'
+    ],
+    'keyspace': 'ddsc',
+    'column_family': 'timeseries',
+}
 SITE_ID = 1
 SECRET_KEY = 'This is not secret but that is ok.'
 INSTALLED_APPS = [

@@ -13,9 +13,8 @@ install_requires = [
     'django-extensions',
     'django-nose',
     'djangorestframework>=2.1.1',
-    'cassandralib',
-    'rabbitmqlib',
-    'tslib',
+    'lizard-ui >= 4.0b5',
+    'ddsc-core',
     'uuid',
     ],
 
