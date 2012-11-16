@@ -10,7 +10,6 @@ from django.contrib.auth.models import User
 from django.utils.translation import ugettext as _
 from lizard_ui.views import UiView
 from lizard_security.models import UserGroup
-from cassandralib.models import CassandraDataStore
 from rabbitmqlib.models import Producer
 from rest_framework import mixins
 from rest_framework import generics
