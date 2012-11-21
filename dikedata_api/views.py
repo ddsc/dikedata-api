@@ -30,6 +30,7 @@ COL_FAM = settings.CASSANDRA['column_family']
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 INTERNAL_TIMEZONE = pytz.UTC
 
+
 class ExceptionResponse(Response):
     def __init__(self, ex):
         super(ExceptionResponse, self).__init__()
@@ -37,12 +38,13 @@ class ExceptionResponse(Response):
         trace = traceback.extract_tb(exc_traceback)
         print trace
         (file, line, method, expr) = trace[-1]
-        error = '%s: %s in %s, line %d' % (ex.__class__.__name__,
-            ', '.join(ex.args), file, line)
+        error = '%s: %s in %s, line %d' % \
+            (ex.__class__.__name__, ', '.join(ex.args), file, line)
         self.data = {'error': error}
-    
+
     def __repr__(self):
         return repr(self.data)
+
 
 class Root(APIView):
     """
@@ -56,13 +58,15 @@ class Root(APIView):
             'timeseries': reverse('timeseries-list', request=request),
         })
 
+
 class APIListView(mixins.ListModelMixin, mixins.CreateModelMixin,
-                    generics.MultipleObjectAPIView):
+                  generics.MultipleObjectAPIView):
     def get(self, request, *args, **kwargs):
 #        try:
             return self.list(request, *args, **kwargs)
 #        except Exception as ex:
 #            return ExceptionResponse(ex)
+
 
 class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                     mixins.DestroyModelMixin, generics.SingleObjectAPIView):
@@ -72,63 +76,76 @@ class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
 #        except Exception as ex:
 #            return ExceptionResponse(ex)
 
+
 class UserList(APIListView):
     model = User
     serializer_class = serializers.UserListSerializer
+
 
 class UserDetail(APIDetailView):
     model = User
     serializer_class = serializers.UserDetailSerializer
 
+
 class GroupList(APIListView):
     model = UserGroup
     serializer_class = serializers.GroupListSerializer
+
 
 class GroupDetail(APIDetailView):
     model = UserGroup
     serializer_class = serializers.GroupDetailSerializer
 
+
 class LocationList(APIListView):
     model = Location
     serializer_class = serializers.LocationListSerializer
+
 
 class LocationDetail(APIDetailView):
     model = Location
     serializer_class = serializers.LocationDetailSerializer
 
+
 class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
+
 
 class TimeseriesDetail(APIDetailView):
     model = Timeseries
     serializer_class = serializers.TimeseriesDetailSerializer
 
+
 class TimeseriesData(APIDetailView):
     model = Timeseries
     serializer_class = serializers.TimeseriesDataSerializer
 
+
 #deprecated
 def timeseries_data(request, series_code):
     cassandra = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM, 10000)
-    
+
     get = request.GET.keys()
     try:
         params = {}
         if 'start' in params:
             start = datetime.strptime(params['start'], COLNAME_FORMAT)
         else:
-            start = datetime.now() + relativedelta( years = -3 )
+            start = datetime.now() + relativedelta(years=-3)
         if 'end' in params:
             end = datetime.strptime(params['end'], COLNAME_FORMAT)
         else:
             end = datetime.now()
         filter = ['value', 'flag']
 
-        df = cassandra.read(series_code,
+        df = cassandra.read(
+            series_code,
             INTERNAL_TIMEZONE.localize(start),
-            INTERNAL_TIMEZONE.localize(end), params=filter)
-        
+            INTERNAL_TIMEZONE.localize(end),
+            params=filter
+        )
+
         data = [
             dict([('datetime', timestamp.strftime(COLNAME_FORMAT))] + [
                 (colname, row[i])
@@ -141,6 +158,7 @@ def timeseries_data(request, series_code):
     except Exception as ex:
         print repr(ExceptionResponse(ex))
         return []
+
 
 #deprecated
 def api_write(request):
@@ -176,9 +194,12 @@ def api_write(request):
 
         # Inform Rabbit MQ
         msg['message_id'] = str(uuid.uuid4())
-        producer = Producer(settings.RABBITMQ['server'],
-            settings.RABBITMQ['user'], settings.RABBITMQ['password'],
-            settings.RABBITMQ['vhost'])
+        producer = Producer(
+            settings.RABBITMQ['server'],
+            settings.RABBITMQ['user'],
+            settings.RABBITMQ['password'],
+            settings.RABBITMQ['vhost']
+        )
         producer.send(msg, b"timeseries", b"store")
         msg['status'] = 'OK'
     except Exception as ex:
