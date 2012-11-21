@@ -24,9 +24,9 @@ import traceback
 import uuid
 
 
+#deprecated
 SERVERS = settings.CASSANDRA['servers']
 KEYSPACE = settings.CASSANDRA['keyspace']
-COL_FAM = settings.CASSANDRA['column_family']
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 INTERNAL_TIMEZONE = pytz.UTC
 
@@ -124,7 +124,7 @@ class TimeseriesData(APIDetailView):
 
 #deprecated
 def timeseries_data(request, series_code):
-    cassandra = CassandraDataStore(SERVERS, KEYSPACE, COL_FAM, 10000)
+    cassandra = CassandraDataStore(SERVERS, KEYSPACE, 10000)
 
     get = request.GET.keys()
     try:
