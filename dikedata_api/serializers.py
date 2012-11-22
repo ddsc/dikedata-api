@@ -12,7 +12,7 @@ class BaseSerializer(serializers.HyperlinkedModelSerializer):
     pass
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='user-detail')
 
@@ -61,19 +61,11 @@ class TimeseriesListSerializer(BaseSerializer):
 
 
 class TimeseriesDetailSerializer(BaseSerializer):
-    data = serializers.HyperlinkedIdentityField(
-        view_name='timeseries-data')
+    events = serializers.HyperlinkedIdentityField(
+        view_name='event-list')
 #    supplying_system = serializers.HyperlinkedRelatedField(
 #        view_name='user-detail')
 
     class Meta:
         model = Timeseries
         exclude = ('supplying_system', )
-
-
-class TimeseriesDataSerializer(BaseSerializer):
-    data = serializers.RelatedField(source='get_series_data')
-
-    class Meta:
-        model = Timeseries
-        fields = ('url', 'data')

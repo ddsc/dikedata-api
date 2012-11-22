@@ -32,9 +32,9 @@ urlpatterns = patterns(
     url(r'^timeseries/(?P<pk>[^/]+)/$',
         views.TimeseriesDetail.as_view(),
         name='timeseries-detail'),
-    url(r'^timeseries/(?P<pk>[^/]+)/data/$',
-        views.TimeseriesData.as_view(),
-        name='timeseries-data'),
+    url(r'^events/(?P<pk>[^/]+)/$',
+        views.EventList.as_view(),
+        name='event-list'),
 #    url(r'^read/', views.api_response),
 #    url(r'^write/', views.api_write),
 )
