@@ -12,25 +12,17 @@ from django.utils.translation import ugettext as _
 from lizard_ui.views import UiView
 from lizard_security.models import UserGroup
 from rabbitmqlib.models import Producer
-from rest_framework import mixins
-from rest_framework import generics
+from rest_framework import generics, mixins
 from rest_framework.exceptions import ParseError
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-import pandas as pd
-import pytz
 import sys
 import traceback
-import uuid
 
 
-#deprecated
-SERVERS = settings.CASSANDRA['servers']
-KEYSPACE = settings.CASSANDRA['keyspace']
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-INTERNAL_TIMEZONE = pytz.UTC
 
 
 def exception_detail(ex):
@@ -41,20 +33,6 @@ def exception_detail(ex):
     detail = '%s: %s in %s, line %d' % \
         (ex.__class__.__name__, ', '.join(ex.args), file, line)
     return detail
-
-class ExceptionResponse(Response):
-    def __init__(self, ex):
-        super(ExceptionResponse, self).__init__()
-        exc_type, exc_value, exc_traceback = sys.exc_info()
-        trace = traceback.extract_tb(exc_traceback)
-        print trace
-        (file, line, method, expr) = trace[-1]
-        error = '%s: %s in %s, line %d' % \
-            (ex.__class__.__name__, ', '.join(ex.args), file, line)
-        self.data = {'error': error}
-
-    def __repr__(self):
-        return repr(self.data)
 
 
 class Root(APIView):
@@ -73,19 +51,19 @@ class Root(APIView):
 class APIListView(mixins.ListModelMixin, mixins.CreateModelMixin,
                   generics.MultipleObjectAPIView):
     def get(self, request, *args, **kwargs):
-#        try:
+        try:
             return self.list(request, *args, **kwargs)
-#        except Exception as ex:
-#            return ExceptionResponse(ex)
+        except Exception as ex:
+            raise ParseError(exception_detail(ex))
 
 
 class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
                     mixins.DestroyModelMixin, generics.SingleObjectAPIView):
     def get(self, request, *args, **kwargs):
-#        try:
+        try:
             return self.retrieve(request, *args, **kwargs)
-#        except Exception as ex:
-#            return ExceptionResponse(ex)
+        except Exception as ex:
+            raise ParseError(exception_detail(ex))
 
 
 class UserList(APIListView):
