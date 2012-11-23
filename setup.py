@@ -11,6 +11,7 @@ long_description = '\n\n'.join([
 install_requires = [
     'Django',
     'django-extensions',
+    'django-filter',
     'django-nose',
     'djangorestframework>=2.1.1',
     'lizard-ui >= 4.0b5',
