@@ -54,7 +54,7 @@ class APIListView(mixins.ListModelMixin, mixins.CreateModelMixin,
         try:
             return self.list(request, *args, **kwargs)
         except Exception as ex:
-            raise ParseError(exception_detail(ex))
+            raise ConfigurationError(exception_detail(ex))
 
 
 class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
@@ -63,7 +63,7 @@ class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
         try:
             return self.retrieve(request, *args, **kwargs)
         except Exception as ex:
-            raise ParseError(exception_detail(ex))
+            raise ConfigurationError(exception_detail(ex))
 
 
 class UserList(APIListView):
