@@ -13,7 +13,7 @@ from lizard_ui.views import UiView
 from lizard_security.models import UserGroup
 from rabbitmqlib.models import Producer
 from rest_framework import generics, mixins
-from rest_framework.exceptions import ParseError
+from rest_framework.exceptions import ConfigurationError, ParseError
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -131,4 +131,6 @@ class EventList(APIDetailView):
                 return Response(events)
             except ValueError as ex:
                 raise ParseError(exception_detail(ex))
+            except Exception as ex:
+                raise ConfigurationError(exception_detail(ex))
         raise Http404()
