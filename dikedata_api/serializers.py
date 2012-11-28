@@ -63,9 +63,14 @@ class TimeseriesListSerializer(BaseSerializer):
 class TimeseriesDetailSerializer(BaseSerializer):
     events = serializers.HyperlinkedIdentityField(
         view_name='event-list')
+    latest_value = serializers.Field()
 #    supplying_system = serializers.HyperlinkedRelatedField(
 #        view_name='user-detail')
 
     class Meta:
         model = Timeseries
-        exclude = ('supplying_system', )
+        exclude = (
+            'supplying_system',
+            'latest_value_number',
+            'latest_value_text',
+        )
