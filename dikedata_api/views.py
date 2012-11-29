@@ -5,7 +5,7 @@ from ddsc_core.models import Location, Timeseries
 from dikedata_api import serializers
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-from django.conf import settings
+from dikedata_api.exceptions import APIException
 from django.contrib.auth.models import User
 from django.http import Http404
 from django.utils.translation import ugettext as _
@@ -13,26 +13,12 @@ from lizard_ui.views import UiView
 from lizard_security.models import UserGroup
 from rabbitmqlib.models import Producer
 from rest_framework import generics, mixins
-from rest_framework.exceptions import ConfigurationError, ParseError
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
-import sys
-import traceback
-
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-
-
-def exception_detail(ex):
-    exc_type, exc_value, exc_traceback = sys.exc_info()
-    trace = traceback.extract_tb(exc_traceback)
-    print trace
-    (file, line, method, expr) = trace[-1]
-    detail = '%s: %s in %s, line %d' % \
-        (ex.__class__.__name__, ', '.join(ex.args), file, line)
-    return detail
 
 
 class Root(APIView):
@@ -54,7 +40,7 @@ class APIListView(mixins.ListModelMixin, mixins.CreateModelMixin,
         try:
             return self.list(request, *args, **kwargs)
         except Exception as ex:
-            raise ConfigurationError(exception_detail(ex))
+            raise APIException(ex)
 
 
 class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
@@ -63,7 +49,7 @@ class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
         try:
             return self.retrieve(request, *args, **kwargs)
         except Exception as ex:
-            raise ConfigurationError(exception_detail(ex))
+            raise APIException(ex)
 
 
 class UserList(APIListView):
@@ -108,29 +94,24 @@ class TimeseriesDetail(APIDetailView):
 
 class EventList(APIDetailView):
 
-    def get(self, request, pk=None, format=None):
+    def retrieve(self, request, pk=None, format=None):
         result = Timeseries.objects.filter(code=pk)
-        if len(result) > 0:
-            ts = result[0]
-            try:
-                start = self.request.QUERY_PARAMS.get('start', None)
-                end = self.request.QUERY_PARAMS.get('end', None)
-                filter = self.request.QUERY_PARAMS.get('filter', None)
-                if start is not None:
-                    start = datetime.strptime(start, COLNAME_FORMAT)
-                if end is not None:
-                    end = datetime.strptime(end, COLNAME_FORMAT)
-                df = ts.get_events(start=start, end=end, filter=filter)
-                events = [
-                    dict([('datetime', timestamp.strftime(COLNAME_FORMAT))] + [
-                        (colname, row[i])
-                        for i, colname in enumerate(df.columns)
-                    ])
-                    for timestamp, row in df.iterrows()
-                ]
-                return Response(events)
-            except ValueError as ex:
-                raise ParseError(exception_detail(ex))
-            except Exception as ex:
-                raise ConfigurationError(exception_detail(ex))
-        raise Http404()
+        if len(result) == 0:
+            raise Http404("Geen timeseries gevonden die voldoet aan de query")
+        ts = result[0]
+        start = self.request.QUERY_PARAMS.get('start', None)
+        end = self.request.QUERY_PARAMS.get('end', None)
+        filter = self.request.QUERY_PARAMS.get('filter', None)
+        if start is not None:
+            start = datetime.strptime(start, COLNAME_FORMAT)
+        if end is not None:
+            end = datetime.strptime(end, COLNAME_FORMAT)
+        df = ts.get_events(start=start, end=end, filter=filter)
+        events = [
+            dict([('datetime', timestamp.strftime(COLNAME_FORMAT))] + [
+                (colname, row[i])
+                for i, colname in enumerate(df.columns)
+            ])
+            for timestamp, row in df.iterrows()
+        ]
+        return Response(events)
