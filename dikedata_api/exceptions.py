@@ -18,8 +18,12 @@ EXCEPTION_MAP = {
     'ValueError':            (200,  10, "Incorrect parameter value format."),
     # Functional problems
     'Http404':               (404,  10, "Resource not found."),
+    'DoesNotExist':          (404,  10, "Resource not found."),
     # Technical problems
-    'Exception':             (500,  10, "Unknown technical error."),
+    'Exception':             (500,   0, "Unknown technical error."),
+    'NameError':             (500,  20, "Technical error"),
+    'DatabaseError':         (500,  30, "Database error."),
+    'FieldError':            (500,  30, "Database error."),
     'AllServersUnavailable': (502,  10, "External server unavailable."),
 }
 
@@ -46,4 +50,4 @@ class APIException(BaseException):
             if self.status_code < 500:
                 logger.debug('%s - %s' % (self.detail, msg))
             else:
-                logger.error('%s - %s' % (self.detail, msg))
+                logger.exception(self.detail)
