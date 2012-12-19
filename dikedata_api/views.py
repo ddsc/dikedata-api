@@ -6,12 +6,14 @@ from dikedata_api import serializers
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from dikedata_api.exceptions import APIException
-from django.contrib.auth.models import User
+from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.models import User, Group as Role
 from django.http import Http404
+from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext as _
 from lizard_ui.views import UiView
 from lizard_security.models import UserGroup
-from rabbitmqlib.models import Producer
+from lizard_security.backends import LizardPermissionBackend
 from rest_framework import generics, mixins
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -19,6 +21,7 @@ from rest_framework.views import APIView
 
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+LOGIN_URL = '/api/auth/login/'
 
 
 class Root(APIView):
@@ -26,15 +29,28 @@ class Root(APIView):
     The entry endpoint of our API.
     """
     def get(self, request, format=None):
-        return Response({
-            'users': reverse('user-list', request=request),
-            'groups': reverse('usergroup-list', request=request),
+        response = {
             'locations': reverse('location-list', request=request),
             'timeseries': reverse('timeseries-list', request=request),
-        })
+        }
+        user = getattr(request, 'user', None)
+        if user is not None and user.is_superuser:
+            response.update({
+                'users': reverse('user-list', request=request),
+                'groups': reverse('usergroup-list', request=request),
+                'roles': reverse('role-list', request=request),
+            })
+        return Response(response)
 
 
-class APIListView(mixins.ListModelMixin, mixins.CreateModelMixin,
+class Protected(object):
+    @method_decorator(permission_required('staff', LOGIN_URL))
+    def dispatch(self, request, *args, **kwargs):
+        return super(Protected, self).dispatch(request, *args, **kwargs)
+
+
+class APIListView(mixins.ListModelMixin,
+                  mixins.CreateModelMixin,
                   generics.MultipleObjectAPIView):
     def get(self, request, *args, **kwargs):
         try:
@@ -42,34 +58,68 @@ class APIListView(mixins.ListModelMixin, mixins.CreateModelMixin,
         except Exception as ex:
             raise APIException(ex)
 
+    @method_decorator(permission_required('add', LOGIN_URL))
+    def post(self, request, *args, **kwargs):
+        try:
+            return self.create(request, *args, **kwargs)
+        except Exception as ex:
+            raise APIException(ex)
 
-class APIDetailView(mixins.RetrieveModelMixin, mixins.UpdateModelMixin,
-                    mixins.DestroyModelMixin, generics.SingleObjectAPIView):
+
+class APIDetailView(mixins.RetrieveModelMixin,
+                    mixins.UpdateModelMixin,
+                    mixins.DestroyModelMixin,
+                    generics.SingleObjectAPIView):
+
     def get(self, request, *args, **kwargs):
         try:
             return self.retrieve(request, *args, **kwargs)
         except Exception as ex:
             raise APIException(ex)
 
+    @method_decorator(permission_required('change', LOGIN_URL))
+    def put(self, request, *args, **kwargs):
+        try:
+            return self.update(request, *args, **kwargs)
+        except Exception as ex:
+            raise APIException(ex)
 
-class UserList(APIListView):
+    @method_decorator(permission_required('delete', LOGIN_URL))
+    def delete(self, request, *args, **kwargs):
+        try:
+            return self.destroy(request, *args, **kwargs)
+        except Exception as ex:
+            raise APIException(ex)
+
+
+class UserList(Protected, APIListView):
     model = User
     serializer_class = serializers.UserListSerializer
 
 
-class UserDetail(APIDetailView):
+class UserDetail(Protected, APIDetailView):
     model = User
     serializer_class = serializers.UserDetailSerializer
 
 
-class GroupList(APIListView):
+class GroupList(Protected, APIListView):
     model = UserGroup
     serializer_class = serializers.GroupListSerializer
 
 
-class GroupDetail(APIDetailView):
+class GroupDetail(Protected, APIDetailView):
     model = UserGroup
     serializer_class = serializers.GroupDetailSerializer
+
+
+class RoleList(Protected, APIListView):
+    model = Role
+    serializer_class = serializers.RoleListSerializer
+
+
+class RoleDetail(Protected, APIDetailView):
+    model = Role
+    serializer_class = serializers.RoleDetailSerializer
 
 
 class LocationList(APIListView):
@@ -93,7 +143,6 @@ class TimeseriesDetail(APIDetailView):
 
 
 class EventList(APIDetailView):
-
     def retrieve(self, request, pk=None, format=None):
         result = Timeseries.objects.filter(code=pk)
         if len(result) == 0:
