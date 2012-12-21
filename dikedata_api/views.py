@@ -50,7 +50,7 @@ class Protected(object):
         return super(Protected, self).dispatch(request, *args, **kwargs)
 
 
-class Writable(mixins.CreateModelMixin):
+class Creatable(mixins.CreateModelMixin):
     @method_decorator(permission_required('add', LOGIN_URL))
     def post(self, request, *args, **kwargs):
         try:
@@ -94,7 +94,7 @@ class APIDetailView(mixins.RetrieveModelMixin,
             raise APIException(ex)
 
 
-class UserList(Protected, APIListView):
+class UserList(Protected, Creatable, APIListView):
     model = User
     serializer_class = serializers.UserListSerializer
 
@@ -104,7 +104,7 @@ class UserDetail(Protected, APIDetailView):
     serializer_class = serializers.UserDetailSerializer
 
 
-class GroupList(Protected, APIListView):
+class GroupList(Protected, Creatable, APIListView):
     model = UserGroup
     serializer_class = serializers.GroupListSerializer
 
@@ -114,7 +114,7 @@ class GroupDetail(Protected, APIDetailView):
     serializer_class = serializers.GroupDetailSerializer
 
 
-class RoleList(Protected, APIListView):
+class RoleList(Protected, Creatable, APIListView):
     model = Role
     serializer_class = serializers.RoleListSerializer
 
@@ -124,7 +124,7 @@ class RoleDetail(Protected, APIDetailView):
     serializer_class = serializers.RoleDetailSerializer
 
 
-class DataSetList(Writable, APIListView):
+class DataSetList(Creatable, APIListView):
     model = DataSet
     serializer_class = serializers.DataSetListSerializer
 
@@ -134,7 +134,7 @@ class DataSetDetail(APIDetailView):
     serializer_class = serializers.DataSetDetailSerializer
 
 
-class LocationList(Writable, APIListView):
+class LocationList(Creatable, APIListView):
     model = Location
     serializer_class = serializers.LocationListSerializer
 
@@ -146,7 +146,7 @@ class LocationDetail(APIDetailView):
     slug_url_kwarg = 'code'
 
 
-class TimeseriesList(Writable, APIListView):
+class TimeseriesList(Creatable, APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
