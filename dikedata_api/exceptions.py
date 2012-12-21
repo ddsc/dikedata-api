@@ -17,6 +17,7 @@ EXCEPTION_MAP = {
     # Interface problems
     'ValueError':            (200,  10, "Incorrect parameter value format."),
     # Functional problems
+    'ValidationError':       (400,  10, "Invalid request"),
     'Http404':               (404,  10, "Resource not found."),
     'DoesNotExist':          (404,  10, "Resource not found."),
     # Technical problems
