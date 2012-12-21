@@ -12,7 +12,7 @@ from django.http import Http404
 from django.utils.decorators import method_decorator
 from django.utils.translation import ugettext as _
 from lizard_ui.views import UiView
-from lizard_security.models import UserGroup
+from lizard_security.models import DataSet, UserGroup
 from lizard_security.backends import LizardPermissionBackend
 from rest_framework import generics, mixins
 from rest_framework.response import Response
@@ -30,6 +30,7 @@ class Root(APIView):
     """
     def get(self, request, format=None):
         response = {
+            'datasets': reverse('dataset-list', request=request),
             'locations': reverse('location-list', request=request),
             'timeseries': reverse('timeseries-list', request=request),
         }
@@ -49,19 +50,20 @@ class Protected(object):
         return super(Protected, self).dispatch(request, *args, **kwargs)
 
 
-class APIListView(mixins.ListModelMixin,
-                  mixins.CreateModelMixin,
-                  generics.MultipleObjectAPIView):
-    def get(self, request, *args, **kwargs):
-        try:
-            return self.list(request, *args, **kwargs)
-        except Exception as ex:
-            raise APIException(ex)
-
+class Writable(mixins.CreateModelMixin):
     @method_decorator(permission_required('add', LOGIN_URL))
     def post(self, request, *args, **kwargs):
         try:
             return self.create(request, *args, **kwargs)
+        except Exception as ex:
+            raise APIException(ex)
+
+
+class APIListView(mixins.ListModelMixin,
+                  generics.MultipleObjectAPIView):
+    def get(self, request, *args, **kwargs):
+        try:
+            return self.list(request, *args, **kwargs)
         except Exception as ex:
             raise APIException(ex)
 
@@ -122,7 +124,17 @@ class RoleDetail(Protected, APIDetailView):
     serializer_class = serializers.RoleDetailSerializer
 
 
-class LocationList(APIListView):
+class DataSetList(Writable, APIListView):
+    model = DataSet
+    serializer_class = serializers.DataSetListSerializer
+
+
+class DataSetDetail(APIDetailView):
+    model = DataSet
+    serializer_class = serializers.DataSetDetailSerializer
+
+
+class LocationList(Writable, APIListView):
     model = Location
     serializer_class = serializers.LocationListSerializer
 
@@ -130,9 +142,11 @@ class LocationList(APIListView):
 class LocationDetail(APIDetailView):
     model = Location
     serializer_class = serializers.LocationDetailSerializer
+    slug_field = 'code'
+    slug_url_kwarg = 'code'
 
 
-class TimeseriesList(APIListView):
+class TimeseriesList(Writable, APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
@@ -140,11 +154,13 @@ class TimeseriesList(APIListView):
 class TimeseriesDetail(APIDetailView):
     model = Timeseries
     serializer_class = serializers.TimeseriesDetailSerializer
+    slug_field = 'code'
+    slug_url_kwarg = 'code'
 
 
-class EventList(APIDetailView):
-    def retrieve(self, request, pk=None, format=None):
-        result = Timeseries.objects.filter(code=pk)
+class EventList(APIListView):
+    def list(self, request, code=None, format=None):
+        result = Timeseries.objects.filter(code=code)
         if len(result) == 0:
             raise Http404("Geen timeseries gevonden die voldoet aan de query")
         ts = result[0]

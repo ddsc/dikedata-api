@@ -5,7 +5,7 @@ from ddsc_core.models import Location, Timeseries
 from django.contrib.auth.models import User, Group as Role
 from django.contrib.gis.db import models
 from rest_framework import serializers
-from lizard_security.models import UserGroup
+from lizard_security.models import DataSet, UserGroup
 
 
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
@@ -49,29 +49,52 @@ class RoleDetailSerializer(BaseSerializer):
         exclude = ('permissions', 'permission_mappers', )
 
 
+class DataSetListSerializer(BaseSerializer):
+    class Meta:
+        model = DataSet
+
+
+class DataSetDetailSerializer(BaseSerializer):
+    timeseries = serializers.ManyHyperlinkedRelatedField(
+        view_name='timeseries-detail', slug_field='code')
+
+    class Meta:
+        model = DataSet
+
+
 class LocationListSerializer(BaseSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name='location-detail', slug_field='code')
     class Meta:
         model = Location
         fields = ('url', 'name', )
 
 
 class LocationDetailSerializer(BaseSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name='location-detail', slug_field='code')
     timeseries = serializers.ManyHyperlinkedRelatedField(
-        view_name='timeseries-detail')
+        view_name='timeseries-detail', slug_field='code')
 
     class Meta:
         model = Location
 
 
 class TimeseriesListSerializer(BaseSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name='timeseries-detail', slug_field='code')
     class Meta:
         model = Timeseries
         fields = ('url', 'name', )
 
 
 class TimeseriesDetailSerializer(BaseSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name='timeseries-detail', slug_field='code')
+    location = serializers.HyperlinkedRelatedField(
+        view_name='location-detail', slug_field='code')
     events = serializers.HyperlinkedIdentityField(
-        view_name='event-list')
+        view_name='event-list', slug_field='code')
     latest_value = serializers.Field()
 #    supplying_system = serializers.HyperlinkedRelatedField(
 #        view_name='user-detail')
@@ -82,5 +105,8 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'supplying_system',
             'latest_value_number',
             'latest_value_text',
-            'data_set',
+            'parameter',
+            'unit',
+            'reference_frame',
+            'compartment',
         )
