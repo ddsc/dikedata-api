@@ -109,4 +109,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'unit',
             'reference_frame',
             'compartment',
+            'measuring_device',
+            'measuring_method',
+            'processing_method',
         )
