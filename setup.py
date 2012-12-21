@@ -13,7 +13,7 @@ install_requires = [
     'django-extensions',
     'django-filter',
     'django-nose',
-    'djangorestframework>=2.1.1',
+    'djangorestframework>=2.1.12',
     'lizard-ui >= 4.0b5',
     'ddsc-core',
     'uuid',
