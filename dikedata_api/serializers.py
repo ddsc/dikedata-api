@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import Location, Timeseries
+from ddsc_core.models import LocationGroup, Location, Timeseries
 from django.contrib.auth.models import User, Group as Role
 from django.contrib.gis.db import models
 from rest_framework import serializers
@@ -62,9 +62,28 @@ class DataSetDetailSerializer(BaseSerializer):
         model = DataSet
 
 
+class LocationGroupListSerializer(BaseSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name='locationgroup-detail')
+    class Meta:
+        model = LocationGroup
+        fields = ('url', 'name', )
+
+
+class LocationGroupDetailSerializer(BaseSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name='locationgroup-detail')
+    locations = serializers.ManyHyperlinkedRelatedField(
+        view_name='location-detail', slug_field='code')
+
+    class Meta:
+        model = LocationGroup
+
+
 class LocationListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='code')
+
     class Meta:
         model = Location
         fields = ('url', 'name', )
@@ -75,9 +94,21 @@ class LocationDetailSerializer(BaseSerializer):
         view_name='location-detail', slug_field='code')
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='code')
+    sublocations = serializers.SerializerMethodField(
+        'get_sublocations')
+    location_groups = serializers.ManyHyperlinkedRelatedField(
+        view_name='locationgroup-detail')
 
     class Meta:
         model = Location
+        exclude = (
+            'path',
+            'depth',
+            'numchild',
+        )
+
+    def get_sublocations(self, obj):
+        return obj.get_children()
 
 
 class TimeseriesListSerializer(BaseSerializer):

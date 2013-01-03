@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import Location, Timeseries
+from ddsc_core.models import LocationGroup, Location, Timeseries
 from dikedata_api import serializers
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -31,6 +31,7 @@ class Root(APIView):
     def get(self, request, format=None):
         response = {
             'datasets': reverse('dataset-list', request=request),
+            'locationgroups': reverse('locationgroup-list', request=request),
             'locations': reverse('location-list', request=request),
             'timeseries': reverse('timeseries-list', request=request),
         }
@@ -132,6 +133,18 @@ class DataSetList(Creatable, APIListView):
 class DataSetDetail(APIDetailView):
     model = DataSet
     serializer_class = serializers.DataSetDetailSerializer
+
+
+class LocationGroupList(Creatable, APIListView):
+    model = LocationGroup
+    serializer_class = serializers.LocationGroupListSerializer
+
+
+class LocationGroupDetail(APIDetailView):
+    model = LocationGroup
+    serializer_class = serializers.LocationGroupDetailSerializer
+    slug_field = 'code'
+    slug_url_kwarg = 'code'
 
 
 class LocationList(Creatable, APIListView):
