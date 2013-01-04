@@ -6,7 +6,7 @@ from dikedata_api import serializers
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from dikedata_api.exceptions import APIException
-from django.contrib.auth.decorators import login_required, permission_required
+from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.http import Http404
 from django.utils.decorators import method_decorator
@@ -21,13 +21,9 @@ from rest_framework.views import APIView
 
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-LOGIN_URL = '/api/auth/login/'
 
 
 class Root(APIView):
-    """
-    The entry endpoint of our API.
-    """
     def get(self, request, format=None):
         response = {
             'datasets': reverse('dataset-list', request=request),
@@ -45,87 +41,102 @@ class Root(APIView):
         return Response(response)
 
 
-class Protected(object):
-    @method_decorator(permission_required('staff', LOGIN_URL))
-    def dispatch(self, request, *args, **kwargs):
-        return super(Protected, self).dispatch(request, *args, **kwargs)
-
-
-class Creatable(mixins.CreateModelMixin):
-    @method_decorator(permission_required('add', LOGIN_URL))
-    def post(self, request, *args, **kwargs):
+class APIBaseView(object):
+    def _dispatch(self, handler, request, *args, **kwargs):
         try:
-            return self.create(request, *args, **kwargs)
+            return handler(request, *args, **kwargs)
         except Exception as ex:
             raise APIException(ex)
+    
 
-
-class APIListView(mixins.ListModelMixin,
+class APIReadOnlyListView(APIBaseView,
+                  mixins.ListModelMixin,
                   generics.MultipleObjectAPIView):
     def get(self, request, *args, **kwargs):
-        try:
-            return self.list(request, *args, **kwargs)
-        except Exception as ex:
-            raise APIException(ex)
+        return self._dispatch(self._list, request, *args, **kwargs)
+
+    def _list(self, request, *args, **kwargs):
+        return self.list(request, *args, **kwargs)
 
 
-class APIDetailView(mixins.RetrieveModelMixin,
+class APIListView(APIReadOnlyListView, mixins.CreateModelMixin):
+    def post(self, request, *args, **kwargs):
+        return self._dispatch(self._create, request, *args, **kwargs)
+
+    @method_decorator(permission_required('add', raise_exception=True))
+    def _create(self, request, *args, **kwargs):
+        return self.create(request, *args, **kwargs)
+
+
+class APIProtectedListView(APIListView):
+    @method_decorator(permission_required('staff', raise_exception=True))
+    def _list(self, request, *args, **kwargs):
+        return super(APIListView, self).list(request, *args, **kwargs)
+
+
+class APIDetailView(APIBaseView,
+                    mixins.RetrieveModelMixin,
                     mixins.UpdateModelMixin,
                     mixins.DestroyModelMixin,
                     generics.SingleObjectAPIView):
-
     def get(self, request, *args, **kwargs):
-        try:
-            return self.retrieve(request, *args, **kwargs)
-        except Exception as ex:
-            raise APIException(ex)
+        return self._dispatch(self._retrieve, request, *args, **kwargs)
 
-    @method_decorator(permission_required('change', LOGIN_URL))
+    def _retrieve(self, request, *args, **kwargs):
+        return self.retrieve(request, *args, **kwargs)
+
     def put(self, request, *args, **kwargs):
-        try:
-            return self.update(request, *args, **kwargs)
-        except Exception as ex:
-            raise APIException(ex)
+        return self._dispatch(self._update, request, *args, **kwargs)
 
-    @method_decorator(permission_required('delete', LOGIN_URL))
+    @method_decorator(permission_required('change', raise_exception=True))
+    def _update(self, request, *args, **kwargs):
+        return self.retrieve(update, *args, **kwargs)
+
     def delete(self, request, *args, **kwargs):
-        try:
-            return self.destroy(request, *args, **kwargs)
-        except Exception as ex:
-            raise APIException(ex)
+        return self._dispatch(self._destroy, request, *args, **kwargs)
+
+    @method_decorator(permission_required('delete', raise_exception=True))
+    def _destroy(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
 
 
-class UserList(Protected, Creatable, APIListView):
+class APIProtectedDetailView(APIDetailView):
+    @method_decorator(permission_required('staff', raise_exception=True))
+    def _retrieve(self, request, *args, **kwargs):
+        return super(APIDetailView, self).retrieve(request, *args, **kwargs)
+
+
+class UserList(APIProtectedListView):
     model = User
     serializer_class = serializers.UserListSerializer
 
 
-class UserDetail(Protected, APIDetailView):
+class UserDetail(APIProtectedDetailView):
     model = User
     serializer_class = serializers.UserDetailSerializer
 
 
-class GroupList(Protected, Creatable, APIListView):
+class GroupList(APIProtectedListView):
     model = UserGroup
     serializer_class = serializers.GroupListSerializer
 
 
-class GroupDetail(Protected, APIDetailView):
+class GroupDetail(APIProtectedDetailView):
     model = UserGroup
     serializer_class = serializers.GroupDetailSerializer
 
 
-class RoleList(Protected, Creatable, APIListView):
+class RoleList(APIProtectedListView):
     model = Role
     serializer_class = serializers.RoleListSerializer
 
 
-class RoleDetail(Protected, APIDetailView):
+class RoleDetail(APIProtectedDetailView):
     model = Role
     serializer_class = serializers.RoleDetailSerializer
 
 
-class DataSetList(Creatable, APIListView):
+class DataSetList(APIListView):
     model = DataSet
     serializer_class = serializers.DataSetListSerializer
 
@@ -135,7 +146,7 @@ class DataSetDetail(APIDetailView):
     serializer_class = serializers.DataSetDetailSerializer
 
 
-class LocationGroupList(Creatable, APIListView):
+class LocationGroupList(APIListView):
     model = LocationGroup
     serializer_class = serializers.LocationGroupListSerializer
 
@@ -147,7 +158,7 @@ class LocationGroupDetail(APIDetailView):
     slug_url_kwarg = 'code'
 
 
-class LocationList(Creatable, APIListView):
+class LocationList(APIListView):
     model = Location
     serializer_class = serializers.LocationListSerializer
 
@@ -159,7 +170,7 @@ class LocationDetail(APIDetailView):
     slug_url_kwarg = 'code'
 
 
-class TimeseriesList(Creatable, APIListView):
+class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
@@ -171,7 +182,7 @@ class TimeseriesDetail(APIDetailView):
     slug_url_kwarg = 'code'
 
 
-class EventList(APIListView):
+class EventList(APIReadOnlyListView):
     def list(self, request, code=None, format=None):
         result = Timeseries.objects.filter(code=code)
         if len(result) == 0:
