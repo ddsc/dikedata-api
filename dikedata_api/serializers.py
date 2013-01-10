@@ -114,9 +114,11 @@ class LocationDetailSerializer(BaseSerializer):
 class TimeseriesListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='code')
+    latest_value = serializers.Field()
+
     class Meta:
         model = Timeseries
-        fields = ('url', 'name', )
+        fields = ('url', 'name', 'value_type', 'latest_value', )
 
 
 class TimeseriesDetailSerializer(BaseSerializer):
