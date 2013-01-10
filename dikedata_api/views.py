@@ -15,6 +15,7 @@ from lizard_ui.views import UiView
 from lizard_security.models import DataSet, UserGroup
 from lizard_security.backends import LizardPermissionBackend
 from rest_framework import generics, mixins
+from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -42,12 +43,14 @@ class Root(APIView):
 
 
 class APIBaseView(object):
+    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
+
     def _dispatch(self, handler, request, *args, **kwargs):
         try:
             return handler(request, *args, **kwargs)
         except Exception as ex:
             raise APIException(ex)
-    
+
 
 class APIReadOnlyListView(APIBaseView,
                   mixins.ListModelMixin,
