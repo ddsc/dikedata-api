@@ -6,6 +6,7 @@ from dikedata_api import serializers
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from dikedata_api.exceptions import APIException
+from django.conf import settings
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.http import Http404
@@ -22,6 +23,9 @@ from rest_framework.views import APIView
 
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+REST_FRAMEWORK = getattr(settings, 'REST_FRAMEWORK', {})
+PAGINATE_BY = getattr(REST_FRAMEWORK, 'PAGINATE_BY', None)
+PAGINATE_BY_PARAM = getattr(REST_FRAMEWORK, 'PAGINATE_BY_PARAM', None)
 
 
 class Root(APIView):
@@ -206,4 +210,9 @@ class EventList(APIReadOnlyListView):
             ])
             for timestamp, row in df.iterrows()
         ]
-        return Response(events)
+        return Response({
+            "count": len(df),
+            "next": None,
+            "previous": None,
+            "results": events,
+        })
