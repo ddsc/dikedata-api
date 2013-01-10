@@ -189,7 +189,7 @@ class EventList(APIReadOnlyListView):
     def list(self, request, code=None, format=None):
         result = Timeseries.objects.filter(code=code)
         if len(result) == 0:
-            raise Http404("Geen timeseries gevonden die voldoet aan de query")
+            raise Http404("Geen timeseries gevonden die voldoen aan de query")
         ts = result[0]
         start = self.request.QUERY_PARAMS.get('start', None)
         end = self.request.QUERY_PARAMS.get('end', None)
