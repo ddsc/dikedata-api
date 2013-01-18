@@ -50,13 +50,13 @@ CASSANDRA = {
 SITE_ID = 1
 SECRET_KEY = 'This is not secret but that is ok.'
 INSTALLED_APPS = [
+    'lizard_security',
     'dikedata_api',
     'lizard_ui',
     'staticfiles',
     'compressor',
     'south',
     'django_nose',
-    'lizard_security',
     'django_extensions',
     'django.contrib.admin',
     'django.contrib.auth',
