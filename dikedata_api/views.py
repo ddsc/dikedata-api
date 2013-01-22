@@ -1,8 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-#from ddsc_core.models import LocationGroup, Location, Timeseries
-from ddsc_core.models import Location, Timeseries
+from ddsc_core.models import LocationGroup, Location, Timeseries
 from dikedata_api import serializers
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
