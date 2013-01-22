@@ -1,7 +1,8 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import LocationGroup, Location, Timeseries
+#from ddsc_core.models import LocationGroup, Location, Timeseries
+from ddsc_core.models import Location, Timeseries
 from django.contrib.auth.models import User, Group as Role
 from django.contrib.gis.db import models
 from rest_framework import serializers
