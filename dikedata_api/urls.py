@@ -1,5 +1,4 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
-from dikedata_api import views
 from django.conf.urls.defaults import include
 from django.conf.urls.defaults import patterns
 from django.conf.urls.defaults import url

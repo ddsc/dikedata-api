@@ -1,49 +1,31 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import LocationGroup, Location, Timeseries
-from dikedata_api import serializers
 from datetime import datetime
-from dateutil.relativedelta import relativedelta
-from dikedata_api.exceptions import APIException
+
 from django.conf import settings
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.http import Http404
 from django.utils.decorators import method_decorator
-from django.utils.translation import ugettext as _
-from lizard_ui.views import UiView
-from lizard_security.models import DataSet, UserGroup
-from lizard_security.backends import LizardPermissionBackend
+
 from rest_framework import generics, mixins
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 
+from lizard_security.models import DataSet, UserGroup
+
+from ddsc_core.models import LocationGroup, Location, Timeseries
+
+from dikedata_api import serializers
+from dikedata_api.exceptions import APIException
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 REST_FRAMEWORK = getattr(settings, 'REST_FRAMEWORK', {})
 PAGINATE_BY = getattr(REST_FRAMEWORK, 'PAGINATE_BY', None)
 PAGINATE_BY_PARAM = getattr(REST_FRAMEWORK, 'PAGINATE_BY_PARAM', None)
-
-
-class Root(APIView):
-    def get(self, request, format=None):
-        response = {
-            'datasets': reverse('dataset-list', request=request),
-            'locationgroups': reverse('locationgroup-list', request=request),
-            'locations': reverse('location-list', request=request),
-            'timeseries': reverse('timeseries-list', request=request),
-        }
-        user = getattr(request, 'user', None)
-        if user is not None and user.is_superuser:
-            response.update({
-                'users': reverse('user-list', request=request),
-                'groups': reverse('usergroup-list', request=request),
-                'roles': reverse('role-list', request=request),
-            })
-        return Response(response)
 
 
 class APIBaseView(object):
