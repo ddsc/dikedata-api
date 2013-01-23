@@ -6,8 +6,6 @@ from django.conf.urls.defaults import url
 
 urlpatterns = patterns(
     '',
-    url(r'^$',
-        views.Root.as_view()),
     url(r'^users/$',
         views.UserList.as_view(),
         name='user-list'),
