@@ -12,8 +12,6 @@ from django.utils.decorators import method_decorator
 from rest_framework import generics, mixins
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
-from rest_framework.reverse import reverse
-from rest_framework.views import APIView
 
 from lizard_security.models import DataSet, UserGroup
 
@@ -38,7 +36,7 @@ class APIBaseView(object):
             raise APIException(ex)
 
 
-class APIReadOnlyListView(APIBaseView,
+class APIReadOnlyListView(APIBaseVgiew,
                   mixins.ListModelMixin,
                   generics.MultipleObjectAPIView):
     def get(self, request, *args, **kwargs):
