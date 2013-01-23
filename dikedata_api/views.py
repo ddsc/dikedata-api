@@ -36,7 +36,7 @@ class APIBaseView(object):
             raise APIException(ex)
 
 
-class APIReadOnlyListView(APIBaseVgiew,
+class APIReadOnlyListView(APIBaseView,
                   mixins.ListModelMixin,
                   generics.MultipleObjectAPIView):
     def get(self, request, *args, **kwargs):
