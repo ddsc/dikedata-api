@@ -15,7 +15,7 @@ from rest_framework.response import Response
 
 from lizard_security.models import DataSet, UserGroup
 
-from ddsc_core.models import LocationGroup, Location, Timeseries
+from ddsc_core.models import Location, Timeseries
 
 from dikedata_api import serializers
 from dikedata_api.exceptions import APIException
@@ -77,7 +77,7 @@ class APIDetailView(APIBaseView,
 
     @method_decorator(permission_required('change', raise_exception=True))
     def _update(self, request, *args, **kwargs):
-        return self.retrieve(update, *args, **kwargs)
+        return self.retrieve(self.request, *args, **kwargs)
 
     def delete(self, request, *args, **kwargs):
         return self._dispatch(self._destroy, request, *args, **kwargs)
@@ -131,18 +131,6 @@ class DataSetList(APIListView):
 class DataSetDetail(APIDetailView):
     model = DataSet
     serializer_class = serializers.DataSetDetailSerializer
-
-
-class LocationGroupList(APIListView):
-    model = LocationGroup
-    serializer_class = serializers.LocationGroupListSerializer
-
-
-class LocationGroupDetail(APIDetailView):
-    model = LocationGroup
-    serializer_class = serializers.LocationGroupDetailSerializer
-    slug_field = 'code'
-    slug_url_kwarg = 'code'
 
 
 class LocationList(APIListView):
