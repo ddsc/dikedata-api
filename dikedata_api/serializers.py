@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import LocationGroup, Location, Timeseries
+from ddsc_core.models import Location, Timeseries
 from django.contrib.auth.models import User, Group as Role
 from rest_framework import serializers
 from lizard_security.models import DataSet, UserGroup
@@ -61,25 +61,6 @@ class DataSetDetailSerializer(BaseSerializer):
 
     class Meta:
         model = DataSet
-
-
-class LocationGroupListSerializer(BaseSerializer):
-    url = serializers.HyperlinkedIdentityField(
-        view_name='locationgroup-detail')
-
-    class Meta:
-        model = LocationGroup
-        fields = ('url', 'name', )
-
-
-class LocationGroupDetailSerializer(BaseSerializer):
-    url = serializers.HyperlinkedIdentityField(
-        view_name='locationgroup-detail')
-    locations = serializers.ManyHyperlinkedRelatedField(
-        view_name='location-detail', slug_field='code')
-
-    class Meta:
-        model = LocationGroup
 
 
 class LocationListSerializer(BaseSerializer):
