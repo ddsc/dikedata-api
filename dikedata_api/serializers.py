@@ -79,8 +79,6 @@ class LocationDetailSerializer(BaseSerializer):
         view_name='timeseries-detail', slug_field='code')
     sublocations = serializers.SerializerMethodField(
         'get_sublocations')
-    location_groups = serializers.ManyHyperlinkedRelatedField(
-        view_name='locationgroup-detail')
 
     class Meta:
         model = Location
