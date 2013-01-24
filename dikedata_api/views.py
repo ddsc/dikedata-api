@@ -13,7 +13,7 @@ from rest_framework import generics, mixins
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 
-from lizard_security.models import DataSet, UserGroup
+from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.models import Location, Timeseries
 
@@ -131,6 +131,17 @@ class DataSetList(APIListView):
 class DataSetDetail(APIDetailView):
     model = DataSet
     serializer_class = serializers.DataSetDetailSerializer
+
+
+class DataOwnerList(APIListView):
+    model = DataOwner
+    serializer_class = serializers.DataSetListSerializer
+
+
+class DataOwnerDetail(APIDetailView):
+    model = DataOwner
+    serializer_class = serializers.DataSetDetailSerializer
+
 
 
 class LocationList(APIListView):

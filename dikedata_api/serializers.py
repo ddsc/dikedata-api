@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from ddsc_core.models import Location, Timeseries
 from django.contrib.auth.models import User, Group as Role
 from rest_framework import serializers
-from lizard_security.models import DataSet, UserGroup
+from lizard_security.models import DataOwner, DataSet, UserGroup
 
 
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
@@ -61,6 +61,17 @@ class DataSetDetailSerializer(BaseSerializer):
 
     class Meta:
         model = DataSet
+
+
+class DataOwnerListSerializer(BaseSerializer):
+    class Meta:
+        model = DataOwner
+
+
+class DataOwnerDetailSerializer(BaseSerializer):
+    class Meta:
+        model = DataOwner
+
 
 
 class LocationListSerializer(BaseSerializer):
