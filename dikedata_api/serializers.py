@@ -73,7 +73,6 @@ class DataOwnerDetailSerializer(BaseSerializer):
         model = DataOwner
 
 
-
 class LocationListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='code')
@@ -90,6 +89,8 @@ class LocationDetailSerializer(BaseSerializer):
         view_name='timeseries-detail', slug_field='code')
     sublocations = serializers.SerializerMethodField(
         'get_sublocations')
+    point_geometry = serializers.Field()
+
 
     class Meta:
         model = Location
@@ -97,6 +98,7 @@ class LocationDetailSerializer(BaseSerializer):
             'path',
             'depth',
             'numchild',
+            'real_geometry',
         )
 
     def get_sublocations(self, obj):
