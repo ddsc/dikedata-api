@@ -51,4 +51,7 @@ urlpatterns = patterns(
     url(r'^events/(?P<code>[^/]+)/$',
         views.EventList.as_view(),
         name='event-list'),
+    url(r'^parameters/$',
+        views.ParameterList.as_view(),
+        name='parameter-list'),
 )

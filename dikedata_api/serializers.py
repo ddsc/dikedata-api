@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import Location, Timeseries
+from ddsc_core.models import Location, Timeseries, Parameter
 from django.contrib.auth.models import User, Group as Role
 from rest_framework import serializers
 from lizard_security.models import DataOwner, DataSet, UserGroup
@@ -138,3 +138,10 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'measuring_method',
             'processing_method',
         )
+
+
+class ParameterListSerializer(BaseSerializer):
+
+    class Meta:
+        model = Parameter
+        exclude = ('url',)
