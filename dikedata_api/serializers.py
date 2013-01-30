@@ -142,17 +142,20 @@ class TimeseriesDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Timeseries
-        exclude = (
-            'supplying_system',
-            'latest_value_number',
-            'latest_value_text',
-            'parameter',
-            'unit',
-            'reference_frame',
-            'compartment',
-            'measuring_device',
-            'measuring_method',
-            'processing_method',
+        fields = (
+            'url',
+            'location',
+            'events',
+            'latest_value',
+            'uuid',
+            'name',
+            'description',
+            'value_type',
+            'source',
+            'owner',
+            'first_value_timestamp',
+            'latest_value_timestamp',
+            'supplying_systems',
         )
 
 
