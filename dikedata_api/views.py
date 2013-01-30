@@ -143,7 +143,6 @@ class DataOwnerDetail(APIDetailView):
     serializer_class = serializers.DataSetDetailSerializer
 
 
-
 class LocationList(APIListView):
     model = Location
     serializer_class = serializers.LocationListSerializer
@@ -152,8 +151,8 @@ class LocationList(APIListView):
 class LocationDetail(APIDetailView):
     model = Location
     serializer_class = serializers.LocationDetailSerializer
-    slug_field = 'code'
-    slug_url_kwarg = 'code'
+    slug_field = 'uuid'
+    slug_url_kwarg = 'uuid'
 
 
 class TimeseriesList(APIListView):
@@ -164,13 +163,13 @@ class TimeseriesList(APIListView):
 class TimeseriesDetail(APIDetailView):
     model = Timeseries
     serializer_class = serializers.TimeseriesDetailSerializer
-    slug_field = 'code'
-    slug_url_kwarg = 'code'
+    slug_field = 'uuid'
+    slug_url_kwarg = 'uuid'
 
 
 class EventList(APIReadOnlyListView):
-    def list(self, request, code=None, format=None):
-        result = Timeseries.objects.filter(code=code)
+    def list(self, request, uuid=None, format=None):
+        result = Timeseries.objects.filter(uuid=uuid)
         if len(result) == 0:
             raise Http404("Geen timeseries gevonden die voldoen aan de query")
         ts = result[0]

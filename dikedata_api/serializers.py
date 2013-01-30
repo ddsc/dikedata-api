@@ -75,7 +75,7 @@ class DataOwnerDetailSerializer(BaseSerializer):
 
 class LocationListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
-        view_name='location-detail', slug_field='code')
+        view_name='location-detail', slug_field='uuid')
 
     class Meta:
         model = Location
@@ -84,11 +84,11 @@ class LocationListSerializer(BaseSerializer):
 
 class LocationDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
-        view_name='location-detail', slug_field='code')
+        view_name='location-detail', slug_field='uuid')
     timeseries = serializers.ManyHyperlinkedRelatedField(
-        view_name='timeseries-detail', slug_field='code')
-    sublocations = serializers.SerializerMethodField(
-        'get_sublocations')
+        view_name='timeseries-detail', slug_field='uuid')
+    superlocation = serializers.SerializerMethodField('get_superlocation')
+    sublocations = serializers.SerializerMethodField('get_sublocations')
     point_geometry = serializers.Field()
 
 
@@ -100,6 +100,10 @@ class LocationDetailSerializer(BaseSerializer):
             'numchild',
             'real_geometry',
         )
+        depth = 10
+
+    def get_superlocation(self, obj):
+        return obj.get_parent()
 
     def get_sublocations(self, obj):
         return obj.get_children()
@@ -107,7 +111,7 @@ class LocationDetailSerializer(BaseSerializer):
 
 class TimeseriesListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
-        view_name='timeseries-detail', slug_field='code')
+        view_name='timeseries-detail', slug_field='uuid')
     latest_value = serializers.Field()
 
     class Meta:
@@ -117,11 +121,11 @@ class TimeseriesListSerializer(BaseSerializer):
 
 class TimeseriesDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
-        view_name='timeseries-detail', slug_field='code')
+        view_name='timeseries-detail', slug_field='uuid')
     location = serializers.HyperlinkedRelatedField(
-        view_name='location-detail', slug_field='code')
+        view_name='location-detail', slug_field='uuid')
     events = serializers.HyperlinkedIdentityField(
-        view_name='event-list', slug_field='code')
+        view_name='event-list', slug_field='uuid')
     latest_value = serializers.Field()
 
     class Meta:
