@@ -76,10 +76,19 @@ class DataOwnerDetailSerializer(BaseSerializer):
 class LocationListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
+    timeseries = serializers.ManyHyperlinkedRelatedField(
+        view_name='timeseries-detail', slug_field='uuid')
+    point_geometry = serializers.Field()
 
     class Meta:
         model = Location
-        fields = ('url', 'name', )
+        fields = (
+            'url',
+            'timeseries',
+            'point_geometry',
+            'uuid',
+            'name',
+        )
 
 
 class LocationDetailSerializer(BaseSerializer):
@@ -91,14 +100,17 @@ class LocationDetailSerializer(BaseSerializer):
     sublocations = serializers.SerializerMethodField('get_sublocations')
     point_geometry = serializers.Field()
 
-
     class Meta:
         model = Location
-        exclude = (
-            'path',
-            'depth',
-            'numchild',
-            'real_geometry',
+        fields = (
+            'url',
+            'timeseries',
+            'superlocation',
+            'sublocations',
+            'point_geometry',
+            'uuid',
+            'name',
+            'description',
         )
         depth = 10
 
