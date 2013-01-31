@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import Location, Timeseries, Parameter
+from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 from django.contrib.auth.models import User, Group as Role
 from rest_framework import serializers
 from lizard_security.models import DataOwner, DataSet, UserGroup
@@ -175,3 +175,32 @@ class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
             'parameter',
         )
         depth = 1
+
+
+class LogicalGroupListSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = LogicalGroup
+        fields = (
+            'url',
+            'name',
+            'timeseries',
+        )
+
+
+class LogicalGroupLinkSerializer(serializers.HyperlinkedModelSerializer):
+    class Meta:
+        model = LogicalGroup
+        fields = (
+            'url',
+            'name',
+        )
+
+
+class LogicalGroupDetailSerializer(serializers.HyperlinkedModelSerializer):
+    timeseries = serializers.ManyHyperlinkedRelatedField(
+        view_name='timeseries-detail', slug_field='uuid')
+    parents = LogicalGroupLinkSerializer(source='parents')
+    children = LogicalGroupLinkSerializer(source='children')
+
+    class Meta:
+        model = LogicalGroup

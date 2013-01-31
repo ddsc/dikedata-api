@@ -57,4 +57,10 @@ urlpatterns = patterns(
     url(r'^parameters/(?P<pk>[^/]+)/$',
         views.ParameterDetail.as_view(),
         name='parameter-detail'),
+    url(r'^logicalgroups/$',
+        views.LogicalGroupList.as_view(),
+        name='logicalgroup-list'),
+    url(r'^logicalgroups/(?P<pk>[^/]+)/$',
+        views.LogicalGroupDetail.as_view(),
+        name='logicalgroup-detail'),
 )

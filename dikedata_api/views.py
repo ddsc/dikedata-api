@@ -15,7 +15,7 @@ from rest_framework.response import Response
 
 from lizard_security.models import DataSet, DataOwner, UserGroup
 
-from ddsc_core.models import Location, Timeseries, Parameter
+from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 
 from dikedata_api import serializers
 from dikedata_api.exceptions import APIException
@@ -199,3 +199,13 @@ class ParameterList(APIListView):
 class ParameterDetail(APIDetailView):
     model = Parameter
     serializer_class = serializers.ParameterDetailSerializer
+
+
+class LogicalGroupList(APIListView):
+    model = LogicalGroup
+    serializer_class = serializers.LogicalGroupListSerializer
+
+
+class LogicalGroupDetail(APIDetailView):
+    model = LogicalGroup
+    serializer_class = serializers.LogicalGroupDetailSerializer
