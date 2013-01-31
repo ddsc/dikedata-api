@@ -7,34 +7,30 @@ from rest_framework import serializers
 from lizard_security.models import DataOwner, DataSet, UserGroup
 
 
-class BaseSerializer(serializers.HyperlinkedModelSerializer):
-    pass
-
-
-class UserListSerializer(BaseSerializer):
+class UserListSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = User
         fields = ('url', 'username', )
 
 
-class UserDetailSerializer(BaseSerializer):
+class UserDetailSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = User
         exclude = ('password', 'groups', 'user_permissions', )
 
 
-class GroupListSerializer(BaseSerializer):
+class GroupListSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = UserGroup
         fields = ('url', 'name', )
 
 
-class GroupDetailSerializer(BaseSerializer):
+class GroupDetailSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = UserGroup
 
 
-class RoleListSerializer(BaseSerializer):
+class RoleListSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='role-detail')
 
     class Meta:
@@ -42,7 +38,7 @@ class RoleListSerializer(BaseSerializer):
         exclude = ('permissions', 'permission_mappers', )
 
 
-class RoleDetailSerializer(BaseSerializer):
+class RoleDetailSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='role-detail')
 
     class Meta:
@@ -50,12 +46,12 @@ class RoleDetailSerializer(BaseSerializer):
         exclude = ('permissions', 'permission_mappers', )
 
 
-class DataSetListSerializer(BaseSerializer):
+class DataSetListSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DataSet
 
 
-class DataSetDetailSerializer(BaseSerializer):
+class DataSetDetailSerializer(serializers.HyperlinkedModelSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='code')
 
@@ -63,17 +59,31 @@ class DataSetDetailSerializer(BaseSerializer):
         model = DataSet
 
 
-class DataOwnerListSerializer(BaseSerializer):
+class DataOwnerListSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DataOwner
 
 
-class DataOwnerDetailSerializer(BaseSerializer):
+class DataOwnerDetailSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = DataOwner
 
 
-class LocationListSerializer(BaseSerializer):
+class ParameterListSerializer(serializers.HyperlinkedModelSerializer):
+
+    class Meta:
+        model = Parameter
+        fields = ('url', 'code', 'description')
+
+
+class ParameterDetailSerializer(serializers.HyperlinkedModelSerializer):
+
+    class Meta:
+        model = Parameter
+        fields = ('url', 'code', 'description', 'cas_number', 'group', 'sikb_id',)
+
+
+class LocationListSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
     timeseries = serializers.ManyHyperlinkedRelatedField(
@@ -91,13 +101,26 @@ class LocationListSerializer(BaseSerializer):
         )
 
 
-class LocationDetailSerializer(BaseSerializer):
+class LocationLinkSerializer(serializers.HyperlinkedModelSerializer):
+    url = serializers.HyperlinkedIdentityField(
+        view_name='location-detail', slug_field='uuid')
+
+    class Meta:
+        model = Location
+        fields = (
+            'url',
+            'name',
+            'description',
+        )
+
+
+class LocationDetailSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
-    superlocation = serializers.SerializerMethodField('get_superlocation')
-    sublocations = serializers.SerializerMethodField('get_sublocations')
+    superlocation = LocationLinkSerializer(source='superlocation')
+    sublocations = LocationLinkSerializer(source='sublocations')
     point_geometry = serializers.Field()
 
     class Meta:
@@ -112,16 +135,9 @@ class LocationDetailSerializer(BaseSerializer):
             'name',
             'description',
         )
-        depth = 10
-
-    def get_superlocation(self, obj):
-        return obj.get_parent()
-
-    def get_sublocations(self, obj):
-        return obj.get_children()
 
 
-class TimeseriesListSerializer(BaseSerializer):
+class TimeseriesListSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='uuid')
     latest_value = serializers.Field()
@@ -131,7 +147,7 @@ class TimeseriesListSerializer(BaseSerializer):
         fields = ('url', 'name', 'value_type', 'latest_value', )
 
 
-class TimeseriesDetailSerializer(BaseSerializer):
+class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='uuid')
     location = serializers.HyperlinkedRelatedField(
@@ -156,11 +172,6 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'first_value_timestamp',
             'latest_value_timestamp',
             'supplying_systems',
+            'parameter',
         )
-
-
-class ParameterListSerializer(BaseSerializer):
-
-    class Meta:
-        model = Parameter
-        exclude = ('url',)
+        depth = 1

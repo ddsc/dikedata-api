@@ -199,3 +199,8 @@ class EventList(APIReadOnlyListView):
 class ParameterList(APIListView):
     model = Parameter
     serializer_class = serializers.ParameterListSerializer
+
+
+class ParameterDetail(APIDetailView):
+    model = Parameter
+    serializer_class = serializers.ParameterDetailSerializer

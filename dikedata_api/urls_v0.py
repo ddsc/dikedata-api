@@ -54,4 +54,7 @@ urlpatterns = patterns(
     url(r'^parameters/$',
         views.ParameterList.as_view(),
         name='parameter-list'),
+    url(r'^parameters/(?P<pk>[^/]+)/$',
+        views.ParameterDetail.as_view(),
+        name='parameter-detail'),
 )
