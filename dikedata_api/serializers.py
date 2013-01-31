@@ -178,6 +178,9 @@ class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class LogicalGroupListSerializer(serializers.HyperlinkedModelSerializer):
+    timeseries = serializers.HyperlinkedIdentityField(
+        view_name='timeseries-detail', slug_field='uuid')
+
     class Meta:
         model = LogicalGroup
         fields = (
