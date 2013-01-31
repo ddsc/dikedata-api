@@ -188,12 +188,7 @@ class EventList(APIReadOnlyListView):
             ])
             for timestamp, row in df.iterrows()
         ]
-        return Response({
-            "count": len(df),
-            "next": None,
-            "previous": None,
-            "results": events,
-        })
+        return Response(events)
 
 
 class ParameterList(APIListView):
