@@ -53,7 +53,7 @@ class DataSetListSerializer(serializers.HyperlinkedModelSerializer):
 
 class DataSetDetailSerializer(serializers.HyperlinkedModelSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
-        view_name='timeseries-detail', slug_field='code')
+        view_name='timeseries-detail', slug_field='uuid')
 
     class Meta:
         model = DataSet
