@@ -86,15 +86,12 @@ class ParameterDetailSerializer(serializers.HyperlinkedModelSerializer):
 class LocationListSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
-    timeseries = serializers.ManyHyperlinkedRelatedField(
-        view_name='timeseries-detail', slug_field='uuid')
     point_geometry = serializers.Field()
 
     class Meta:
         model = Location
         fields = (
             'url',
-            'timeseries',
             'point_geometry',
             'uuid',
             'name',
@@ -140,6 +137,7 @@ class LocationDetailSerializer(serializers.HyperlinkedModelSerializer):
 class TimeseriesListSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='uuid')
+    value_type = serializers.Field('get_value_type')
     latest_value = serializers.Field()
 
     class Meta:
@@ -154,6 +152,7 @@ class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
         view_name='location-detail', slug_field='uuid')
     events = serializers.HyperlinkedIdentityField(
         view_name='event-list', slug_field='uuid')
+    value_type = serializers.Field('get_value_type')
     latest_value = serializers.Field()
 
     class Meta:
@@ -178,7 +177,7 @@ class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
 
 
 class LogicalGroupListSerializer(serializers.HyperlinkedModelSerializer):
-    timeseries = serializers.HyperlinkedIdentityField(
+    timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
 
     class Meta:
