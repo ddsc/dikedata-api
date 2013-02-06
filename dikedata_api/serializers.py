@@ -137,12 +137,14 @@ class LocationDetailSerializer(serializers.HyperlinkedModelSerializer):
 class TimeseriesListSerializer(serializers.HyperlinkedModelSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='uuid')
+    events = serializers.HyperlinkedIdentityField(
+        view_name='event-list', slug_field='uuid')
     value_type = serializers.Field('get_value_type')
     latest_value = serializers.Field()
 
     class Meta:
         model = Timeseries
-        fields = ('url', 'name', 'value_type', 'latest_value', )
+        fields = ('url', 'name', 'value_type', 'latest_value', 'events', )
 
 
 class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
