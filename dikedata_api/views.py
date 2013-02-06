@@ -21,9 +21,6 @@ from dikedata_api import serializers
 from dikedata_api.exceptions import APIException
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-REST_FRAMEWORK = getattr(settings, 'REST_FRAMEWORK', {})
-PAGINATE_BY = getattr(REST_FRAMEWORK, 'PAGINATE_BY', None)
-PAGINATE_BY_PARAM = getattr(REST_FRAMEWORK, 'PAGINATE_BY_PARAM', None)
 
 
 class APIBaseView(object):
@@ -147,6 +144,16 @@ class LocationList(APIListView):
     model = Location
     serializer_class = serializers.LocationListSerializer
 
+    def get_queryset(self):
+        kwargs = {}
+        parameter = self.request.QUERY_PARAMS.get('parameter', None)
+        if parameter:
+            kwargs['timeseries__parameter__in'] = parameter.split(',')
+        logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
+        if logicalgroup:
+            kwargs['timeseries__logicalgroup__in'] = logicalgroup.split(',')
+        return Location.objects.filter(**kwargs).distinct()
+
 
 class LocationDetail(APIDetailView):
     model = Location
@@ -169,6 +176,7 @@ class TimeseriesDetail(APIDetailView):
 
 class EventList(APIReadOnlyListView):
     def list(self, request, uuid=None, format=None):
+        CASSANDRA = getattr(settings, 'CASSANDRA', {})
         result = Timeseries.objects.filter(uuid=uuid)
         if len(result) == 0:
             raise Http404("Geen timeseries gevonden die voldoen aan de query")
@@ -195,6 +203,16 @@ class ParameterList(APIListView):
     model = Parameter
     serializer_class = serializers.ParameterListSerializer
 
+    def get_queryset(self):
+        kwargs = {'group' : 'Grootheid'}
+        logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
+        if logicalgroup:
+            kwargs['timeseries__logicalgroup__in'] = logicalgroup.split(',')
+        location = self.request.QUERY_PARAMS.get('location', None)
+        if location:
+            kwargs['timeseries__location__uuid__in'] = location.split(',')
+        return Parameter.objects.filter(**kwargs).distinct()
+
 
 class ParameterDetail(APIDetailView):
     model = Parameter
@@ -204,6 +222,16 @@ class ParameterDetail(APIDetailView):
 class LogicalGroupList(APIListView):
     model = LogicalGroup
     serializer_class = serializers.LogicalGroupListSerializer
+
+    def get_queryset(self):
+        kwargs = {}
+        location = self.request.QUERY_PARAMS.get('location', None)
+        if location:
+            kwargs['timeseries__location__uuid__in'] = location.split(',')
+        parameter = self.request.QUERY_PARAMS.get('parameter', None)
+        if parameter:
+            kwargs['timeseries__parameter__in'] = parameter.split(',')
+        return LogicalGroup.objects.filter(**kwargs).distinct()
 
 
 class LogicalGroupDetail(APIDetailView):
