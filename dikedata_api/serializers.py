@@ -18,30 +18,35 @@ class ManyHyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
         method = getattr(obj, field_name)
         return [self.to_native(item) for item in method()]
 
-class UserListSerializer(serializers.HyperlinkedModelSerializer):
+
+class BaseSerializer(serializers.HyperlinkedModelSerializer):
+    id = serializers.Field('id')
+
+
+class UserListSerializer(BaseSerializer):
     class Meta:
         model = User
         fields = ('url', 'username', )
 
 
-class UserDetailSerializer(serializers.HyperlinkedModelSerializer):
+class UserDetailSerializer(BaseSerializer):
     class Meta:
         model = User
         exclude = ('password', 'groups', 'user_permissions', )
 
 
-class GroupListSerializer(serializers.HyperlinkedModelSerializer):
+class GroupListSerializer(BaseSerializer):
     class Meta:
         model = UserGroup
         fields = ('url', 'name', )
 
 
-class GroupDetailSerializer(serializers.HyperlinkedModelSerializer):
+class GroupDetailSerializer(BaseSerializer):
     class Meta:
         model = UserGroup
 
 
-class RoleListSerializer(serializers.HyperlinkedModelSerializer):
+class RoleListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='role-detail')
 
     class Meta:
@@ -49,7 +54,7 @@ class RoleListSerializer(serializers.HyperlinkedModelSerializer):
         exclude = ('permissions', 'permission_mappers', )
 
 
-class RoleDetailSerializer(serializers.HyperlinkedModelSerializer):
+class RoleDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(view_name='role-detail')
 
     class Meta:
@@ -57,12 +62,12 @@ class RoleDetailSerializer(serializers.HyperlinkedModelSerializer):
         exclude = ('permissions', 'permission_mappers', )
 
 
-class DataSetListSerializer(serializers.HyperlinkedModelSerializer):
+class DataSetListSerializer(BaseSerializer):
     class Meta:
         model = DataSet
 
 
-class DataSetDetailSerializer(serializers.HyperlinkedModelSerializer):
+class DataSetDetailSerializer(BaseSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
 
@@ -70,32 +75,32 @@ class DataSetDetailSerializer(serializers.HyperlinkedModelSerializer):
         model = DataSet
 
 
-class DataOwnerListSerializer(serializers.HyperlinkedModelSerializer):
+class DataOwnerListSerializer(BaseSerializer):
     class Meta:
         model = DataOwner
 
 
-class DataOwnerDetailSerializer(serializers.HyperlinkedModelSerializer):
+class DataOwnerDetailSerializer(BaseSerializer):
     class Meta:
         model = DataOwner
 
 
-class ParameterListSerializer(serializers.HyperlinkedModelSerializer):
+class ParameterListSerializer(BaseSerializer):
 
     class Meta:
         model = Parameter
-        fields = ('url', 'code', 'description')
+        fields = ('id', 'url', 'code', 'description')
 
 
-class ParameterDetailSerializer(serializers.HyperlinkedModelSerializer):
+class ParameterDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Parameter
-        fields = ('url', 'code', 'description', 'cas_number', 'group'
+        fields = ('id', 'url', 'code', 'description', 'cas_number', 'group',
             'sikb_id')
 
 
-class SubSubLocationSerializer(serializers.HyperlinkedModelSerializer):
+class SubSubLocationSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
     point_geometry = serializers.Field()
@@ -146,7 +151,7 @@ class LocationDetailSerializer(SubSubLocationSerializer):
         )
 
 
-class TimeseriesListSerializer(serializers.HyperlinkedModelSerializer):
+class TimeseriesListSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='uuid')
     events = serializers.HyperlinkedIdentityField(
@@ -162,7 +167,7 @@ class TimeseriesListSerializer(serializers.HyperlinkedModelSerializer):
         depth = 1
 
 
-class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
+class TimeseriesDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='uuid')
     location = serializers.HyperlinkedRelatedField(
@@ -193,29 +198,22 @@ class TimeseriesDetailSerializer(serializers.HyperlinkedModelSerializer):
         depth = 1
 
 
-class LogicalGroupListSerializer(serializers.HyperlinkedModelSerializer):
+class LogicalGroupListSerializer(BaseSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
 
     class Meta:
         model = LogicalGroup
-        fields = (
-            'url',
-            'name',
-            'timeseries',
-        )
+        fields = ('id', 'url', 'name', 'timeseries',)
 
 
-class LogicalGroupLinkSerializer(serializers.HyperlinkedModelSerializer):
+class LogicalGroupLinkSerializer(BaseSerializer):
     class Meta:
         model = LogicalGroup
-        fields = (
-            'url',
-            'name',
-        )
+        fields = ('id', 'url', 'name',)
 
 
-class LogicalGroupDetailSerializer(serializers.HyperlinkedModelSerializer):
+class LogicalGroupDetailSerializer(BaseSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
     parents = LogicalGroupLinkSerializer(source='parents')
