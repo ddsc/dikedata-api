@@ -145,7 +145,7 @@ class LocationList(APIListView):
     serializer_class = serializers.LocationListSerializer
 
     def get_queryset(self):
-        kwargs = {}
+        kwargs = {'depth': 1}
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
             kwargs['timeseries__parameter__in'] = parameter.split(',')
