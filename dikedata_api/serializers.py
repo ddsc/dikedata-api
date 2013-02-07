@@ -19,6 +19,18 @@ class ManyHyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
         return [self.to_native(item) for item in method()]
 
 
+class ManyHyperlinkedParents(serializers.HyperlinkedRelatedField):
+    def field_to_native(self, obj, field_name):
+        manager = getattr(obj, field_name)
+        return [self.to_native(item.parent) for item in manager.all()]
+
+
+class ManyHyperlinkedChilds(serializers.HyperlinkedRelatedField):
+    def field_to_native(self, obj, field_name):
+        manager = getattr(obj, field_name)
+        return [self.to_native(item.child) for item in manager.all()]
+
+
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
     id = serializers.Field('id')
 
@@ -199,15 +211,6 @@ class TimeseriesDetailSerializer(BaseSerializer):
 
 
 class LogicalGroupListSerializer(BaseSerializer):
-    timeseries = serializers.ManyHyperlinkedRelatedField(
-        view_name='timeseries-detail', slug_field='uuid')
-
-    class Meta:
-        model = LogicalGroup
-        fields = ('id', 'url', 'name', 'timeseries',)
-
-
-class LogicalGroupLinkSerializer(BaseSerializer):
     class Meta:
         model = LogicalGroup
         fields = ('id', 'url', 'name',)
@@ -216,8 +219,10 @@ class LogicalGroupLinkSerializer(BaseSerializer):
 class LogicalGroupDetailSerializer(BaseSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
-    parents = LogicalGroupLinkSerializer(source='parents')
-    children = LogicalGroupLinkSerializer(source='children')
+    parents = ManyHyperlinkedParents(
+        view_name='logicalgroup-detail', read_only=True)
+    childs = ManyHyperlinkedChilds(
+        view_name='logicalgroup-detail', read_only=True)
 
     class Meta:
         model = LogicalGroup
