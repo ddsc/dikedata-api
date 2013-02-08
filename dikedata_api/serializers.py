@@ -2,33 +2,10 @@
 from __future__ import unicode_literals
 
 from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
+from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from rest_framework import serializers
 from lizard_security.models import DataOwner, DataSet, UserGroup
-
-
-class HyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
-    def field_to_native(self, obj, field_name):
-        method = getattr(obj, field_name)
-        return self.to_native(method())
-
-
-class ManyHyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
-    def field_to_native(self, obj, field_name):
-        method = getattr(obj, field_name)
-        return [self.to_native(item) for item in method()]
-
-
-class ManyHyperlinkedParents(serializers.HyperlinkedRelatedField):
-    def field_to_native(self, obj, field_name):
-        manager = getattr(obj, field_name)
-        return [self.to_native(item.parent) for item in manager.all()]
-
-
-class ManyHyperlinkedChilds(serializers.HyperlinkedRelatedField):
-    def field_to_native(self, obj, field_name):
-        manager = getattr(obj, field_name)
-        return [self.to_native(item.child) for item in manager.all()]
 
 
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
@@ -143,9 +120,9 @@ class LocationListSerializer(SubLocationSerializer):
 class LocationDetailSerializer(SubSubLocationSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
-    superlocation = HyperlinkedRelatedMethod(
+    superlocation = fields.HyperlinkedRelatedMethod(
         view_name='location-detail', slug_field='uuid', read_only=True)
-    sublocations = ManyHyperlinkedRelatedMethod(
+    sublocations = fields.ManyHyperlinkedRelatedMethod(
         view_name='location-detail', slug_field='uuid', read_only=True)
     point_geometry = serializers.Field()
 
@@ -170,11 +147,12 @@ class TimeseriesListSerializer(BaseSerializer):
         view_name='event-list', slug_field='uuid')
     value_type = serializers.Field('get_value_type')
     latest_value = serializers.Field()
+    latest_value = fields.LatestValue(view_name='event-detail')
     parameter = ParameterListSerializer()
 
     class Meta:
         model = Timeseries
-        fields = ('url', 'name', 'value_type', 'latest_value', 'events',
+        fields = ('url', 'events', 'latest_value', 'name', 'value_type',
                   'parameter')
         depth = 1
 
@@ -187,7 +165,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
     events = serializers.HyperlinkedIdentityField(
         view_name='event-list', slug_field='uuid')
     value_type = serializers.Field('get_value_type')
-    latest_value = serializers.Field()
+    latest_value = fields.LatestValue(view_name='event-detail')
 
     class Meta:
         model = Timeseries
@@ -219,9 +197,9 @@ class LogicalGroupListSerializer(BaseSerializer):
 class LogicalGroupDetailSerializer(BaseSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
-    parents = ManyHyperlinkedParents(
+    parents = fields.ManyHyperlinkedParents(
         view_name='logicalgroup-detail', read_only=True)
-    childs = ManyHyperlinkedChilds(
+    childs = fields.ManyHyperlinkedChilds(
         view_name='logicalgroup-detail', read_only=True)
 
     class Meta:

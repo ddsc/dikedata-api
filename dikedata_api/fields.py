@@ -1,0 +1,40 @@
+# (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
+from __future__ import unicode_literals
+
+from rest_framework import serializers
+from rest_framework.reverse import reverse
+
+
+class HyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
+    def field_to_native(self, obj, field_name):
+        method = getattr(obj, field_name)
+        return self.to_native(method())
+
+
+class ManyHyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
+    def field_to_native(self, obj, field_name):
+        method = getattr(obj, field_name)
+        return [self.to_native(item) for item in method()]
+
+
+class ManyHyperlinkedParents(serializers.HyperlinkedRelatedField):
+    def field_to_native(self, obj, field_name):
+        manager = getattr(obj, field_name)
+        return [self.to_native(item.parent) for item in manager.all()]
+
+
+class ManyHyperlinkedChilds(serializers.HyperlinkedRelatedField):
+    def field_to_native(self, obj, field_name):
+        manager = getattr(obj, field_name)
+        return [self.to_native(item.child) for item in manager.all()]
+
+
+class LatestValue(serializers.HyperlinkedIdentityField):
+    def field_to_native(self, obj, field_name):
+        if obj.is_file():
+            latest_value = obj.latest_value_file()
+            if latest_value:
+                return reverse('event-detail', args=[obj.uuid, latest_value],
+                    request=self.context['request'])
+            return None
+        return obj.latest_value()

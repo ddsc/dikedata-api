@@ -3,15 +3,19 @@ from __future__ import unicode_literals
 
 from datetime import datetime
 
+import mimetypes
+
 from django.conf import settings
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
 from rest_framework import generics, mixins
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
+from rest_framework.reverse import reverse
+from rest_framework.views import APIView
 
 from lizard_security.models import DataSet, DataOwner, UserGroup
 
@@ -21,6 +25,9 @@ from dikedata_api import serializers
 from dikedata_api.exceptions import APIException
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%SZ'
+
+mimetypes.init()
 
 
 class APIBaseView(object):
@@ -166,6 +173,12 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
+    def get(self, request, format=None):
+        timeseries = Timeseries.objects.all()
+        serializer = serializers.TimeseriesListSerializer(
+            timeseries, context={'request': request})
+        return Response(serializer.data)
+
 
 class TimeseriesDetail(APIDetailView):
     model = Timeseries
@@ -176,7 +189,6 @@ class TimeseriesDetail(APIDetailView):
 
 class EventList(APIReadOnlyListView):
     def list(self, request, uuid=None, format=None):
-        CASSANDRA = getattr(settings, 'CASSANDRA', {})
         result = Timeseries.objects.filter(uuid=uuid)
         if len(result) == 0:
             raise Http404("Geen timeseries gevonden die voldoen aan de query")
@@ -189,14 +201,45 @@ class EventList(APIReadOnlyListView):
         if end is not None:
             end = datetime.strptime(end, COLNAME_FORMAT)
         df = ts.get_events(start=start, end=end, filter=filter)
-        events = [
-            dict([('datetime', timestamp.strftime(COLNAME_FORMAT))] + [
-                (colname, row[i])
-                for i, colname in enumerate(df.columns)
-            ])
-            for timestamp, row in df.iterrows()
-        ]
+        if ts.is_file():
+            events = [
+                dict([('datetime', timestamp.strftime(COLNAME_FORMAT)),
+                    ('value', reverse('event-detail',
+                    args=[ts.uuid, timestamp.strftime(FILENAME_FORMAT)],
+                    request=request))])
+                for timestamp, row in df.iterrows()
+            ]
+        else:
+            events = [
+                dict([('datetime', timestamp.strftime(COLNAME_FORMAT))] +
+                    [(colname, row[i]) for i, colname in enumerate(df.columns)]
+                )
+                for timestamp, row in df.iterrows()
+            ]
         return Response(events)
+
+
+class EventDetail(APIView):
+    def get(self, request, uuid=None, dt=None, format=None):
+        result = Timeseries.objects.filter(uuid=uuid)
+        if len(result) == 0:
+            raise Http404("Geen timeseries gevonden die voldoen aan de query")
+        ts = result[0]
+        timestamp = datetime.strptime(dt, FILENAME_FORMAT)
+        try:
+            (file_data, file_mime, file_size) = ts.get_file(timestamp)
+        except IOError:
+            raise Http404("File not found")
+        response = HttpResponse(file_data, mimetype=file_mime)
+        if file_mime is not None:
+            response['Content-Type'] = file_mime
+        if (ts.value_type == Timeseries.ValueType.FILE):
+            file_ext = mimetypes.guess_extension(file_mime)
+            file_name = "%s-%s%s" % (ts.uuid, dt, file_ext)
+            response['Content-Disposition'] = 'attachment; filename=' + file_name
+        if (file_size > 0):
+            response['Content-Length'] = file_size
+        return response
 
 
 class ParameterList(APIListView):
