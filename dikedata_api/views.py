@@ -248,7 +248,45 @@ class EventList(APIReadOnlyListView):
         return events
 
     @staticmethod
-    def format_flot(request, primary_ts, df):
+    def format_flot(request, ts, df):
+        # see if a tolerance is provided
+        tolerance = request.QUERY_PARAMS.get('tolerance', None)
+
+        # prepare a response compatible with the Flot JavaScript
+        flot_response = []
+
+        # add values to the response
+        # convert event dates to timestamps with milliseconds since epoch
+        timestamps = [
+            float(calendar.timegm(timestamp.timetuple()) * 1000)
+            for timestamp in df.index
+        ]
+
+        # decimate only operates on Numpy arrays
+        timestamps = np.array(timestamps)
+        values = df['value'].values
+
+        # decimate values (using Douglas-Peucker) only when requested
+        if tolerance is not None:
+            try:
+                tolerance = float(tolerance)
+            except ValueError:
+                tolerance = None
+            if tolerance is not None:
+                timestamps, values = decimate(timestamps, values, tolerance)
+
+        line = {
+            'label': str(ts),
+            'data': zip(timestamps, values),
+            'parameter_name': str(ts.parameter),
+            'parameter_pk': ts.parameter.pk
+        }
+        flot_response.append(line)
+
+        return flot_response
+
+    @staticmethod
+    def format_flot_many(request, primary_ts, df):
         # retrieve the other Timeseries
         # non-existent Timeseries are ignored
         other_uuids = request.QUERY_PARAMS.get('other_uuids', '')
@@ -316,6 +354,7 @@ class EventList(APIReadOnlyListView):
             flot_response['data'].append(line_data)
 
         return flot_response
+
 
 class EventDetail(APIView):
     def get(self, request, uuid=None, dt=None, format=None):
