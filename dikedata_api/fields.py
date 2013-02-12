@@ -5,6 +5,18 @@ from rest_framework import serializers
 from rest_framework.reverse import reverse
 
 
+class RelatedField(serializers.ModelField):
+    def field_to_native(self, obj, field_name):
+        relation = getattr(obj, field_name)
+        return getattr(relation, self.model_field, None)
+
+
+class ManyRelatedField(serializers.ModelField):
+    def field_to_native(self, obj, field_name):
+        manager = getattr(obj, field_name)
+        return [getattr(rel, self.model_field, None) for rel in manager.all()]
+
+
 class HyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
     def field_to_native(self, obj, field_name):
         method = getattr(obj, field_name)

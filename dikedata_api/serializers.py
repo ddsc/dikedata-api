@@ -146,15 +146,15 @@ class TimeseriesListSerializer(BaseSerializer):
     events = serializers.HyperlinkedIdentityField(
         view_name='event-list', slug_field='uuid')
     value_type = serializers.Field('get_value_type')
-    latest_value = serializers.Field()
     latest_value = fields.LatestValue(view_name='event-detail')
-    parameter = ParameterListSerializer()
+    parameter = fields.RelatedField(model_field='id')
+    location = fields.RelatedField(model_field='uuid')
+    logical_groups = fields.ManyRelatedField(model_field='id')
 
     class Meta:
         model = Timeseries
         fields = ('url', 'events', 'latest_value', 'name', 'value_type',
-                  'parameter')
-        depth = 1
+                  'parameter', 'location', 'logical_groups')
 
 
 class TimeseriesDetailSerializer(BaseSerializer):

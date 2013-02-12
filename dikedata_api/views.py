@@ -162,7 +162,7 @@ class LocationList(APIListView):
             kwargs['timeseries__parameter__in'] = parameter.split(',')
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
         if logicalgroup:
-            kwargs['timeseries__logicalgroup__in'] = logicalgroup.split(',')
+            kwargs['timeseries__logical_groups__in'] = logicalgroup.split(',')
         return Location.objects.filter(**kwargs).distinct()
 
 
@@ -177,11 +177,18 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
-    def get(self, request, format=None):
-        timeseries = Timeseries.objects.all()
-        serializer = serializers.TimeseriesListSerializer(
-            timeseries, context={'request': request})
-        return Response(serializer.data)
+    def get_queryset(self):
+        kwargs = {}
+        logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
+        if logicalgroup:
+            kwargs['logical_groups__in'] = logicalgroup.split(',')
+        location = self.request.QUERY_PARAMS.get('location', None)
+        if location:
+            kwargs['location__uuid__in'] = location.split(',')
+        parameter = self.request.QUERY_PARAMS.get('parameter', None)
+        if parameter:
+            kwargs['parameter__in'] = parameter.split(',')
+        return Timeseries.objects.filter(**kwargs).distinct()
 
 
 class TimeseriesDetail(APIDetailView):
@@ -341,7 +348,7 @@ class ParameterList(APIListView):
         kwargs = {'group' : 'Grootheid'}
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
         if logicalgroup:
-            kwargs['timeseries__logicalgroup__in'] = logicalgroup.split(',')
+            kwargs['timeseries__logical_groups__in'] = logicalgroup.split(',')
         location = self.request.QUERY_PARAMS.get('location', None)
         if location:
             kwargs['timeseries__location__uuid__in'] = location.split(',')
