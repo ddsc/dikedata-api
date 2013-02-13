@@ -173,12 +173,6 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
-    def get(self, request, format=None):
-        timeseries = Timeseries.objects.all()
-        serializer = serializers.TimeseriesListSerializer(
-            timeseries, context={'request': request})
-        return Response(serializer.data)
-
 
 class TimeseriesDetail(APIDetailView):
     model = Timeseries
