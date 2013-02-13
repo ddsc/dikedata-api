@@ -173,6 +173,19 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
+    def get_queryset(self):
+        kwargs = {}
+        logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
+        if logicalgroup:
+            kwargs['logicalgroup__in'] = logicalgroup.split(',')
+        location = self.request.QUERY_PARAMS.get('location', None)
+        if location:
+            kwargs['location__uuid__in'] = location.split(',')
+        parameter = self.request.QUERY_PARAMS.get('parameter', None)
+        if parameter:
+            kwargs['parameter__in'] = parameter.split(',')
+        return Timeseries.objects.filter(**kwargs).distinct()
+
 
 class TimeseriesDetail(APIDetailView):
     model = Timeseries
