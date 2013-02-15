@@ -4,6 +4,7 @@ from __future__ import unicode_literals
 from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
+from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from lizard_security.models import DataOwner, DataSet, UserGroup
 
@@ -186,6 +187,34 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'parameter',
         )
         depth = 1
+
+
+class EventListSerializer(serializers.Serializer):
+
+    class Meta:
+        pass
+
+    def mandatory_fields(self):
+        return {
+            "datetime": serializers.WritableField(),
+            "value": serializers.WritableField(),
+        }
+
+    def restore_fields(self, data, files):
+        if data is not None and not isinstance(data, dict):
+            self._errors['non_field_errors'] = [u'Invalid data']
+            return None
+
+        for field_name, field in self.mandatory_fields().items():
+            try:
+                field.validate(data.get(field_name))
+            except ValidationError as err:
+                self._errors[field_name] = list(err.messages)
+
+        return data
+
+    def to_native(self, obj):
+        return obj
 
 
 class LogicalGroupListSerializer(BaseSerializer):

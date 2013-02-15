@@ -28,6 +28,8 @@ from dikedata_api import mixins, serializers
 from dikedata_api.exceptions import APIException
 from dikedata_api.douglas_peucker import decimate
 
+from tslib.readers import ListReader
+
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%SZ'
 
@@ -173,6 +175,28 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
     def handle_exception(self, exc):
         wrapped = APIException(exc)
         return super(EventList, self).handle_exception(wrapped)
+
+    def write(self, data):
+        reader = ListReader(data)
+        for (uuid, df) in reader.get_series():
+            # 404 on unknown timeseries
+            try:
+                ts = Timeseries.objects.get(uuid=uuid)
+            except Timeseries.DoesNotExist:
+                raise Http404("Geen timeseries gevonden die voldoen aan de query")
+
+            ts.set_events(df)
+            ts.save()
+
+    def create(self, request, uuid=None):
+        serializer = serializers.EventListSerializer(data=request.DATA)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        data = [{"uuid": uuid, "events": serializer.data}]
+        result = self.write(data)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
 
     def list(self, request, uuid=None, format=None):
         # 404 on unknown timeseries
