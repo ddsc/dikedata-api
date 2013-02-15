@@ -254,29 +254,36 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
         # prepare a response compatible with the Flot JavaScript
         flot_response = []
 
-        # add values to the response
-        # convert event dates to timestamps with milliseconds since epoch
-        timestamps = [
-            float(calendar.timegm(timestamp.timetuple()) * 1000)
-            for timestamp in df.index
-        ]
+        if len(df) > 0:
+            # add values to the response
+            # convert event dates to timestamps with milliseconds since epoch
+            timestamps = [
+                float(calendar.timegm(timestamp.timetuple()) * 1000)
+                for timestamp in df.index
+            ]
 
-        # decimate only operates on Numpy arrays
-        timestamps = np.array(timestamps)
-        values = df['value'].values
+            # decimate only operates on Numpy arrays
+            timestamps = np.array(timestamps)
 
-        # decimate values (using Douglas-Peucker) only when requested
-        if tolerance is not None:
-            try:
-                tolerance = float(tolerance)
-            except ValueError:
-                tolerance = None
+            values = df['value'].values
+
+            # decimate values (using Douglas-Peucker) only when requested
             if tolerance is not None:
-                timestamps, values = decimate(timestamps, values, tolerance)
+                try:
+                    tolerance = float(tolerance)
+                except ValueError:
+                    tolerance = None
+                if tolerance is not None:
+                    timestamps, values = decimate(timestamps, values, tolerance)
+
+            data = zip(timestamps, values)
+        else:
+            # no events
+            data = []
 
         line = {
             'label': str(ts),
-            'data': zip(timestamps, values),
+            'data': data,
             'parameter_name': str(ts.parameter),
             'parameter_pk': ts.parameter.pk
         }
