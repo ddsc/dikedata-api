@@ -36,6 +36,19 @@ FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%SZ'
 mimetypes.init()
 
 
+def write_events(data):
+    reader = ListReader(data)
+    for (uuid, df) in reader.get_series():
+        # 404 on unknown timeseries
+        try:
+            ts = Timeseries.objects.get(uuid=uuid)
+        except Timeseries.DoesNotExist:
+            raise Http404("Geen timeseries gevonden die voldoen aan de query")
+
+        ts.set_events(df)
+        ts.save()
+
+
 class APIBaseListView(generics.MultipleObjectAPIView):
     renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
 
@@ -169,6 +182,23 @@ class TimeseriesDetail(APIDetailView):
     slug_url_kwarg = 'uuid'
 
 
+class MultiEventList(mixins.PostListModelMixin, APIView):
+    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
+
+    def handle_exception(self, exc):
+        wrapped = APIException(exc)
+        return super(MultiEventList, self).handle_exception(wrapped)
+
+    def create(self, request, uuid=None):
+        serializer = serializers.MultiEventListSerializer(data=request.DATA)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=400)
+
+        result = write_events(serializer.data)
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=201, headers=headers)
+
+
 class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
     renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
 
@@ -176,25 +206,13 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
         wrapped = APIException(exc)
         return super(EventList, self).handle_exception(wrapped)
 
-    def write(self, data):
-        reader = ListReader(data)
-        for (uuid, df) in reader.get_series():
-            # 404 on unknown timeseries
-            try:
-                ts = Timeseries.objects.get(uuid=uuid)
-            except Timeseries.DoesNotExist:
-                raise Http404("Geen timeseries gevonden die voldoen aan de query")
-
-            ts.set_events(df)
-            ts.save()
-
     def create(self, request, uuid=None):
         serializer = serializers.EventListSerializer(data=request.DATA)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
         data = [{"uuid": uuid, "events": serializer.data}]
-        result = self.write(data)
+        result = write_events(data)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
 

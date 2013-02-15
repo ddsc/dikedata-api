@@ -217,6 +217,34 @@ class EventListSerializer(serializers.Serializer):
         return obj
 
 
+class MultiEventListSerializer(serializers.Serializer):
+
+    class Meta:
+        pass
+
+    def mandatory_fields(self):
+        return {
+            "uuid": serializers.WritableField(),
+            "events": EventListSerializer(),
+        }
+
+    def restore_fields(self, data, files):
+        if data is not None and not isinstance(data, dict):
+            self._errors['non_field_errors'] = [u'Invalid data']
+            return None
+
+        for field_name, field in self.mandatory_fields().items():
+            try:
+                field.validate(data.get(field_name))
+            except ValidationError as err:
+                self._errors[field_name] = list(err.messages)
+
+        return data
+
+    def to_native(self, obj):
+        return obj
+
+
 class LogicalGroupListSerializer(BaseSerializer):
     class Meta:
         model = LogicalGroup
