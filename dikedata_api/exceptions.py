@@ -17,15 +17,19 @@ EXCEPTION_MAP = {
     # Interface problems
     'ValueError':            (200,  10, "Incorrect parameter value format."),
     # Functional problems
+    'ParseError':            (400,  10, "Incorrect request format."),
+    'TypeError':             (400,  20, "Incorrect request content."),
     'PermissionDenied':      (403,  10, "Permission denied."),
     'Http404':               (404,  10, "Resource not found."),
     'DoesNotExist':          (404,  10, "Resource not found."),
+    'MethodNotAllowed':      (405,  10, "Request method not available."),
     # Technical problems
     'Exception':             (500,   0, "Unknown technical error."),
     'NameError':             (500,  20, "Technical error"),
     'DatabaseError':         (500,  30, "Database error."),
     'FieldError':            (500,  30, "Database error."),
     'AllServersUnavailable': (502,  10, "External server unavailable."),
+    'MaximumRetryException': (502,  20, "External server error"),
 }
 
 class APIException(BaseException):
