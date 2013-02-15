@@ -11,7 +11,7 @@ from django.contrib.auth.models import User, Group as Role
 from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
-from rest_framework import generics, mixins
+from rest_framework import generics
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
@@ -21,7 +21,7 @@ from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 
-from dikedata_api import serializers
+from dikedata_api import mixins, serializers
 from dikedata_api.exceptions import APIException
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
@@ -30,71 +30,40 @@ FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%SZ'
 mimetypes.init()
 
 
-class APIBaseView(object):
+class APIBaseListView(generics.MultipleObjectAPIView):
     renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
 
-    def _dispatch(self, handler, request, *args, **kwargs):
-        try:
-            return handler(request, *args, **kwargs)
-        except Exception as ex:
-            raise APIException(ex)
+    def handle_exception(self, exc):
+        wrapped = APIException(exc)
+        return super(APIBaseListView, self).handle_exception(wrapped)
 
 
-class APIReadOnlyListView(APIBaseView,
-                  mixins.ListModelMixin,
-                  generics.MultipleObjectAPIView):
-    def get(self, request, *args, **kwargs):
-        return self._dispatch(self._list, request, *args, **kwargs)
+class APIBaseDetailView(generics.SingleObjectAPIView):
+    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
 
-    def _list(self, request, *args, **kwargs):
-        return self.list(request, *args, **kwargs)
+    def handle_exception(self, exc):
+        wrapped = APIException(exc)
+        return super(APIBaseDetailView, self).handle_exception(wrapped)
 
 
-class APIListView(APIReadOnlyListView, mixins.CreateModelMixin):
-    def post(self, request, *args, **kwargs):
-        return self._dispatch(self._create, request, *args, **kwargs)
-
-    @method_decorator(permission_required('add', raise_exception=True))
-    def _create(self, request, *args, **kwargs):
-        return self.create(request, *args, **kwargs)
+class APIReadOnlyListView(mixins.GetListModelMixin, APIBaseListView):
+    pass
 
 
-class APIProtectedListView(APIListView):
-    @method_decorator(permission_required('staff', raise_exception=True))
-    def _list(self, request, *args, **kwargs):
-        return super(APIListView, self).list(request, *args, **kwargs)
+class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
+    pass
 
 
-class APIDetailView(APIBaseView,
-                    mixins.RetrieveModelMixin,
-                    mixins.UpdateModelMixin,
-                    mixins.DestroyModelMixin,
-                    generics.SingleObjectAPIView):
-    def get(self, request, *args, **kwargs):
-        return self._dispatch(self._retrieve, request, *args, **kwargs)
-
-    def _retrieve(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
-
-    def put(self, request, *args, **kwargs):
-        return self._dispatch(self._update, request, *args, **kwargs)
-
-    @method_decorator(permission_required('change', raise_exception=True))
-    def _update(self, request, *args, **kwargs):
-        return self.retrieve(self.request, *args, **kwargs)
-
-    def delete(self, request, *args, **kwargs):
-        return self._dispatch(self._destroy, request, *args, **kwargs)
-
-    @method_decorator(permission_required('delete', raise_exception=True))
-    def _destroy(self, request, *args, **kwargs):
-        return self.destroy(request, *args, **kwargs)
+class APIProtectedListView(mixins.ProtectedGetListModelMixin, APIListView):
+    pass
 
 
-class APIProtectedDetailView(APIDetailView):
-    @method_decorator(permission_required('staff', raise_exception=True))
-    def _retrieve(self, request, *args, **kwargs):
-        return super(APIDetailView, self).retrieve(request, *args, **kwargs)
+class APIDetailView(mixins.DetailModelMixin, APIBaseDetailView):
+    pass
+
+
+class APIProtectedDetailView(mixins.ProtectedGetDetailModelMixin, APIDetailView):
+    pass
 
 
 class UserList(APIProtectedListView):
@@ -194,7 +163,13 @@ class TimeseriesDetail(APIDetailView):
     slug_url_kwarg = 'uuid'
 
 
-class EventList(APIReadOnlyListView):
+class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
+    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
+
+    def handle_exception(self, exc):
+        wrapped = APIException(exc)
+        return super(EventList, self).handle_exception(wrapped)
+
     def list(self, request, uuid=None, format=None):
         result = Timeseries.objects.filter(uuid=uuid)
         if len(result) == 0:
