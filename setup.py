@@ -17,6 +17,7 @@ install_requires = [
     'lizard-ui >= 4.0b5',
     'ddsc-core',
     'uuid',
+    'numpy',
     ],
 
 tests_require = [
