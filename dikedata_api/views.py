@@ -330,7 +330,8 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
                 tolerance = tolerance_h
 
             # Apply the actual line simplification.
-            if tolerance is not None:
+            # Only possible on 2 or more values.
+            if tolerance is not None and len(df) > 1:
                 before = len(values)
                 timestamps, values = decimate_until(timestamps, values, tolerance)
                 logger.debug('decimate: %s values left of %s, with tol = %s', len(values), before, tolerance)
