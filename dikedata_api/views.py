@@ -3,7 +3,7 @@ from __future__ import unicode_literals
 
 from datetime import datetime
 import calendar
-
+import logging
 import mimetypes
 
 from django.conf import settings
@@ -26,11 +26,14 @@ from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 
 from dikedata_api import mixins, serializers
 from dikedata_api.exceptions import APIException
-from dikedata_api.douglas_peucker import decimate
+from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
 
 from tslib.readers import ListReader
 
+logger = logging.getLogger(__name__)
+
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
+COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
 FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%SZ'
 
 mimetypes.init()
@@ -231,9 +234,17 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
 
         # parse start and end date
         if start is not None:
-            start = datetime.strptime(start, COLNAME_FORMAT)
+            try:
+                start = datetime.strptime(start, COLNAME_FORMAT)
+            except ValueError:
+                # use the alternative format
+                start = datetime.strptime(start, COLNAME_FORMAT_MS)
         if end is not None:
-            end = datetime.strptime(end, COLNAME_FORMAT)
+            try:
+                end = datetime.strptime(end, COLNAME_FORMAT)
+            except ValueError:
+                # use the alternative format
+                end = datetime.strptime(end, COLNAME_FORMAT_MS)
 
         # only return in jQuery Flot compatible format when requested
         if eventsformat is None:
@@ -241,7 +252,7 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
             response = self.format_default(request, ts, df)
         elif eventsformat == 'flot':
             df = ts.get_events(start=start, end=end, filter=filter)
-            response = self.format_flot(request, ts, df)
+            response = self.format_flot(request, ts, df, start, end)
 
         return Response(response)
 
@@ -265,119 +276,80 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
         return events
 
     @staticmethod
-    def format_flot(request, ts, df):
-        # see if a tolerance is provided
+    def format_flot(request, ts, df, start=None, end=None):
         tolerance = request.QUERY_PARAMS.get('tolerance', None)
-
-        # prepare a response compatible with the Flot JavaScript
-        flot_response = []
+        width = request.QUERY_PARAMS.get('width', None)
+        height = request.QUERY_PARAMS.get('height', None)
 
         if len(df) > 0:
-            # add values to the response
-            # convert event dates to timestamps with milliseconds since epoch
-            timestamps = [
-                float(calendar.timegm(timestamp.timetuple()) * 1000)
-                for timestamp in df.index
-            ]
+            def to_js_timestamp(dt):
+                return float(calendar.timegm(dt.timetuple()) * 1000)
+            # Add values to the response.
+            # Convert event dates to timestamps with milliseconds since epoch.
+            # TODO see if source timezone / display timezone are relevant
+            timestamps = [to_js_timestamp(dt) for dt in df.index]
 
-            # decimate only operates on Numpy arrays
+            # Decimate only operates on Numpy arrays, so convert our timestamps
+            # back to one.
             timestamps = np.array(timestamps)
-
             values = df['value'].values
 
-            # decimate values (using Douglas-Peucker) only when requested
+            # Decimate values (a.k.a. line simplification), using Ramer-Douglas-Peucker.
+            # Determine tolerance using either the provided value,
+            # or calculate it using width and height of the graph.
             if tolerance is not None:
                 try:
                     tolerance = float(tolerance)
                 except ValueError:
                     tolerance = None
-                if tolerance is not None:
-                    timestamps, values = decimate(timestamps, values, tolerance)
+            elif width is not None and height is not None:
+                # Assume graph scales with min and max of the entire range here.
+                # Otherwise we need to pass axes min/max as well.
+                try:
+                    width = float(width)
+                    if start and end:
+                        # use min and max of the actual requested graph range
+                        tolerance_w_requested = (to_js_timestamp(end) - to_js_timestamp(start)) / width
+                    else:
+                        tolerance_w_requested = 0
+                    # Check with min and max of the entire timeseries, and use
+                    # whichever is higher.
+                    # Timestamps are sorted, so we can just do this.
+                    tolerance_w_possible = (timestamps[-1] - timestamps[0]) / width
+                    tolerance_w = max(tolerance_w_requested, tolerance_w_possible)
+                except ValueError:
+                    tolerance_w = None
+
+                try:
+                    height = float(height)
+                    tolerance_h = (values.max() - values.min()) / height
+                except ValueError:
+                    tolerance_h = None
+
+                # Just use vertical tolerance for now, until we have a better 2D solution.
+                tolerance = tolerance_h
+
+            # Apply the actual line simplification.
+            if tolerance is not None:
+                before = len(values)
+                timestamps, values = decimate_until(timestamps, values, tolerance)
+                logger.debug('decimate: %s values left of %s, with tol = %s', len(values), before, tolerance)
 
             data = zip(timestamps, values)
         else:
-            # no events
+            # No events, nothing to return.
             data = []
 
         line = {
             'label': str(ts),
             'data': data,
+            # These are added to determine the axis which will be related
+            # to the graph line.
             'parameter_name': str(ts.parameter),
             'parameter_pk': ts.parameter.pk
         }
-        flot_response.append(line)
 
-        return flot_response
-
-    @staticmethod
-    def format_flot_many(request, primary_ts, df):
-        # retrieve the other Timeseries
-        # non-existent Timeseries are ignored
-        other_uuids = request.QUERY_PARAMS.get('other_uuids', '')
-        other_uuids = other_uuids.split(',')
-        if other_uuids:
-            other_ts_qs = Timeseries.objects.filter(uuid__in=other_uuids)
-        else:
-            # no need to hit the DB
-            other_ts_qs = None
-
-        # prepare a list of timeseries to plot them all
-        ts_list = [primary_ts]
-        if other_ts_qs:
-            ts_list += [ts for ts in other_ts_qs]
-
-        # see if a tolerance is provided
-        tolerance = request.QUERY_PARAMS.get('tolerance', None)
-
-        # build a list of parameters
-        parameters = []
-        for ts in ts_list:
-            if ts.parameter not in parameters:
-                parameters.append(ts.parameter)
-
-        # prepare a response compatible with the Flot JavaScript
-        flot_response = {
-            'x_min': 0,
-            'x_max': 0,
-            'y_min': 0,
-            'y_max': 0,
-            'x_label': None,
-            'y_labels': [str(parameter) for parameter in parameters],
-            'data': []
-        }
-
-        # add all timeseries to the response
-        for ts in ts_list:
-            # convert event dates to timestamps with milliseconds since epoch
-            timestamps = [
-                float(calendar.timegm(timestamp.timetuple()) * 1000)
-                for timestamp in df.index
-            ]
-
-            # decimate only operates on Numpy arrays
-            timestamps = np.array(timestamps)
-            values = df['value'].values
-
-            # decimate values (using Douglas-Peucker) only when requested
-            if tolerance is not None:
-                try:
-                    tolerance = float(tolerance)
-                except ValueError:
-                    tolerance = None
-                if tolerance is not None:
-                    timestamps, values = decimate(timestamps, values, tolerance)
-
-            line_data = {
-                'label': str(ts),
-                'data': zip(timestamps, values),
-                # position in parameters list determines what axis
-                # this Timeseries should be drawn on
-                'yaxis': parameters.index(ts.parameter) + 1
-            }
-
-            flot_response['data'].append(line_data)
-
-        return flot_response
+        return line
 
 
 class EventDetail(APIView):
