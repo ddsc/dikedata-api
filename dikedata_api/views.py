@@ -337,9 +337,13 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
                 logger.debug('decimate: %s values left of %s, with tol = %s', len(values), before, tolerance)
 
             data = zip(timestamps, values)
+            xmin = timestamps[-1] # timestamps is sorted
+            xmax = timestamps[0]  # timestamps is sorted
         else:
             # No events, nothing to return.
             data = []
+            xmin = None
+            xmax = None
 
         line = {
             'label': str(ts),
@@ -347,7 +351,11 @@ class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
             # These are added to determine the axis which will be related
             # to the graph line.
             'parameter_name': str(ts.parameter),
-            'parameter_pk': ts.parameter.pk
+            'parameter_pk': ts.parameter.pk,
+            # These are used to reset the graph boundaries when the first
+            # line is plotted.
+            'xmin': xmin,
+            'xmax': xmax,
         }
 
         return line
