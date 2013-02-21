@@ -9,6 +9,7 @@ import mimetypes
 from django.conf import settings
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
+from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
@@ -21,6 +22,7 @@ import numpy as np
 
 from lizard_security.models import DataSet, DataOwner, UserGroup
 
+from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 
 from dikedata_api import mixins, serializers
@@ -37,15 +39,23 @@ FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%SZ'
 mimetypes.init()
 
 
-def write_events(data):
+def write_events(user, data):
+    if user is None:
+        raise PermissionDenied("User not logged in.")
     reader = ListReader(data)
+    series = {}
+    permission = True
     for (uuid, df) in reader.get_series():
-        # 404 on unknown timeseries
         try:
             ts = Timeseries.objects.get(uuid=uuid)
+            series[uuid] = (ts, df)
         except Timeseries.DoesNotExist:
             raise Http404("Geen timeseries gevonden die voldoen aan de query")
-
+        if not user.has_perm(PERMISSION_CHANGE, ts):
+            permission = False
+    if not permission:
+        raise PermissionDenied("Permission denied")
+    for uuid, (ts, df) in series.items():
         ts.set_events(df)
         ts.save()
 
@@ -59,45 +69,37 @@ class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
     pass
 
 
-class APIProtectedListView(mixins.ProtectedGetListModelMixin, APIListView):
-    pass
-
-
 class APIDetailView(mixins.BaseMixin, mixins.DetailModelMixin,
                     generics.SingleObjectAPIView):
     pass
 
 
-class APIProtectedDetailView(mixins.ProtectedGetDetailModelMixin, APIDetailView):
-    pass
-
-
-class UserList(APIProtectedListView):
+class UserList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
     model = User
     serializer_class = serializers.UserListSerializer
 
 
-class UserDetail(APIProtectedDetailView):
+class UserDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
     model = User
     serializer_class = serializers.UserDetailSerializer
 
 
-class GroupList(APIProtectedListView):
+class GroupList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
     model = UserGroup
     serializer_class = serializers.GroupListSerializer
 
 
-class GroupDetail(APIProtectedDetailView):
+class GroupDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
     model = UserGroup
     serializer_class = serializers.GroupDetailSerializer
 
 
-class RoleList(APIProtectedListView):
+class RoleList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
     model = Role
     serializer_class = serializers.RoleListSerializer
 
 
-class RoleDetail(APIProtectedDetailView):
+class RoleDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
     model = Role
     serializer_class = serializers.RoleDetailSerializer
 
@@ -171,30 +173,29 @@ class TimeseriesDetail(APIDetailView):
 
 class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
-    def create(self, request, uuid=None):
+    def post(self, request, uuid=None):
         serializer = serializers.MultiEventListSerializer(data=request.DATA)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
-        result = write_events(serializer.data)
+        result = write_events(getattr(request, 'user', None), serializer.data)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
 
 
-class EventList(mixins.BaseMixin, mixins.PostListModelMixin,
-                mixins.GetListModelMixin, APIView):
+class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
-    def create(self, request, uuid=None):
+    def post(self, request, uuid=None):
         serializer = serializers.EventListSerializer(data=request.DATA)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
         data = [{"uuid": uuid, "events": serializer.data}]
-        result = write_events(data)
+        result = write_events(getattr(request, 'user', None), data)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
 
-    def list(self, request, uuid=None, format=None):
+    def get(self, request, uuid=None, format=None):
         # 404 on unknown timeseries
         try:
             ts = Timeseries.objects.get(uuid=uuid)

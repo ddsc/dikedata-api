@@ -28,10 +28,14 @@ class PostListModelMixin(mixins.CreateModelMixin):
         return self.create(request, *args, **kwargs)
 
 
-class ProtectedGetListModelMixin(mixins.ListModelMixin):
+class ProtectedListModelMixin(mixins.ListModelMixin, mixins.CreateModelMixin):
     @method_decorator(permission_required('staff', raise_exception=True))
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
+
+    @method_decorator(permission_required('staff', raise_exception=True))
+    def post(self, request, *args, **kwargs):
+        return self.create(request, *args, **kwargs)
 
 
 class DetailModelMixin(mixins.RetrieveModelMixin,
@@ -49,13 +53,17 @@ class DetailModelMixin(mixins.RetrieveModelMixin,
         return self.destroy(request, *args, **kwargs)
 
 
-class ProtectedGetDetailModelMixin(mixins.RetrieveModelMixin):
+class ProtectedDetailModelMixin(mixins.RetrieveModelMixin,
+                                mixins.UpdateModelMixin,
+                                mixins.DestroyModelMixin):
     @method_decorator(permission_required('staff', raise_exception=True))
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
+    @method_decorator(permission_required('staff', raise_exception=True))
+    def put(self, request, *args, **kwargs):
+        return self.update(request, *args, **kwargs)
 
-class ExceptionHandlerMixin(object):
-    def handle_exception(self, exc):
-        wrapped = APIException(exc)
-        return super(APIDetailView, self).handle_exception(wrapped)
+    @method_decorator(permission_required('staff', raise_exception=True))
+    def delete(self, request, *args, **kwargs):
+        return self.destroy(request, *args, **kwargs)
