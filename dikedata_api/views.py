@@ -13,7 +13,6 @@ from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
 from rest_framework import generics
-from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -25,7 +24,6 @@ from lizard_security.models import DataSet, DataOwner, UserGroup
 from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 
 from dikedata_api import mixins, serializers
-from dikedata_api.exceptions import APIException
 from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
 
 from tslib.readers import ListReader
@@ -52,23 +50,8 @@ def write_events(data):
         ts.save()
 
 
-class APIBaseListView(generics.MultipleObjectAPIView):
-    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
-
-    def handle_exception(self, exc):
-        wrapped = APIException(exc)
-        return super(APIBaseListView, self).handle_exception(wrapped)
-
-
-class APIBaseDetailView(generics.SingleObjectAPIView):
-    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
-
-    def handle_exception(self, exc):
-        wrapped = APIException(exc)
-        return super(APIBaseDetailView, self).handle_exception(wrapped)
-
-
-class APIReadOnlyListView(mixins.GetListModelMixin, APIBaseListView):
+class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
+                          generics.MultipleObjectAPIView):
     pass
 
 
@@ -80,7 +63,8 @@ class APIProtectedListView(mixins.ProtectedGetListModelMixin, APIListView):
     pass
 
 
-class APIDetailView(mixins.DetailModelMixin, APIBaseDetailView):
+class APIDetailView(mixins.BaseMixin, mixins.DetailModelMixin,
+                    generics.SingleObjectAPIView):
     pass
 
 
@@ -185,12 +169,7 @@ class TimeseriesDetail(APIDetailView):
     slug_url_kwarg = 'uuid'
 
 
-class MultiEventList(mixins.PostListModelMixin, APIView):
-    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
-
-    def handle_exception(self, exc):
-        wrapped = APIException(exc)
-        return super(MultiEventList, self).handle_exception(wrapped)
+class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
     def create(self, request, uuid=None):
         serializer = serializers.MultiEventListSerializer(data=request.DATA)
@@ -202,12 +181,8 @@ class MultiEventList(mixins.PostListModelMixin, APIView):
         return Response(serializer.data, status=201, headers=headers)
 
 
-class EventList(mixins.PostListModelMixin, mixins.GetListModelMixin, APIView):
-    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
-
-    def handle_exception(self, exc):
-        wrapped = APIException(exc)
-        return super(EventList, self).handle_exception(wrapped)
+class EventList(mixins.BaseMixin, mixins.PostListModelMixin,
+                mixins.GetListModelMixin, APIView):
 
     def create(self, request, uuid=None):
         serializer = serializers.EventListSerializer(data=request.DATA)
@@ -384,7 +359,7 @@ class EventDetail(APIView):
         return response
 
 
-class ParameterList(APIListView):
+class ParameterList(APIReadOnlyListView):
     model = Parameter
     serializer_class = serializers.ParameterListSerializer
 

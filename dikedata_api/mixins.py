@@ -3,8 +3,18 @@ from __future__ import unicode_literals
 
 from django.contrib.auth.decorators import permission_required
 from django.utils.decorators import method_decorator
-
 from rest_framework import generics, mixins
+from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
+
+from dikedata_api.exceptions import APIException
+
+
+class BaseMixin(object):
+    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
+
+    def handle_exception(self, exc):
+        wrapped = APIException(exc)
+        return super(BaseMixin, self).handle_exception(wrapped)
 
 
 class GetListModelMixin(mixins.ListModelMixin):
