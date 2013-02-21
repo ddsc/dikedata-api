@@ -189,8 +189,8 @@ class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
     def post(self, request, uuid=None):
-        username = self.request.DATA.get('username', None)
-        password = self.request.DATA.get('password', None)
+        username = request.QUERY_PARAMS.get('username', None)
+        password = request.QUERY_PARAMS.get('password', None)
         
         # Sensors can authenticate by username and password in each request
         if username and password:
