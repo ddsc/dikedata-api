@@ -11,10 +11,12 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, HttpResponse
+from django.http import Http404, HttpResponse, QueryDict
 from django.utils.decorators import method_decorator
 
-from rest_framework import generics
+from rest_framework import generics, HTTP_HEADER_ENCODING
+from rest_framework.compat import BytesIO
+from rest_framework.request import Empty
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -61,6 +63,32 @@ def write_events(user, data):
     for uuid, (ts, df) in series.items():
         ts.set_events(df)
         ts.save()
+
+
+def authenticate_and_overload(request):
+    # Sensors can authenticate by username and password in each request.
+    # When they do, a login is faked and the request stream is overloaded,
+    # forcing a re-parse of the event json data.
+    if not isinstance(request.DATA, QueryDict):
+        return
+
+    username = request.DATA.get('username', None)
+    password = request.DATA.get('password', None)
+    events = request.DATA.get('events', None)
+    
+    if username and password and events:
+        request.user = authenticate(username=username, password=password)
+        if not hasattr(request, 'user_group_ids'):
+            request.user_group_ids = set()
+        if not request.user.is_anonymous():
+            groups = request.user.user_group_memberships.values_list(
+                'id', flat=True)
+            request.user_group_ids = request.user_group_ids.union(groups)
+        mw = TLSRequestMiddleware()
+        mw.process_request(request)
+        request._content_type = 'application/json'
+        request._stream = BytesIO(events.encode(HTTP_HEADER_ENCODING))
+        request._data, request._files = (Empty, Empty)
 
 
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
@@ -177,6 +205,8 @@ class TimeseriesDetail(APIDetailView):
 class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
     def post(self, request, uuid=None):
+        authenticate_and_overload(request)
+
         serializer = serializers.MultiEventListSerializer(data=request.DATA)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
@@ -189,20 +219,7 @@ class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
     def post(self, request, uuid=None):
-        username = request.QUERY_PARAMS.get('username', None)
-        password = request.QUERY_PARAMS.get('password', None)
-        
-        # Sensors can authenticate by username and password in each request
-        if username and password:
-            request.user = authenticate(username=username, password=password)
-            if not hasattr(request, 'user_group_ids'):
-                request.user_group_ids = set()
-            if not request.user.is_anonymous():
-                groups = request.user.user_group_memberships.values_list(
-                    'id', flat=True)
-                request.user_group_ids = request.user_group_ids.union(groups)
-            mw = TLSRequestMiddleware()
-            mw.process_request(request)
+        authenticate_and_overload(request)
 
         serializer = serializers.EventListSerializer(data=request.DATA)
         if not serializer.is_valid():
