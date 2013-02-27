@@ -11,12 +11,10 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import PermissionDenied
-from django.http import Http404, HttpResponse, QueryDict
+from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
-from rest_framework import generics, HTTP_HEADER_ENCODING
-from rest_framework.compat import BytesIO
-from rest_framework.request import Empty
+from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -65,18 +63,18 @@ def write_events(user, data):
         ts.save()
 
 
-def authenticate_and_overload(request):
+def authenticate_request(request):
     # Sensors can authenticate by username and password in each request.
     # When they do, a login is faked and the request stream is overloaded,
     # forcing a re-parse of the event json data.
-    if not isinstance(request.DATA, QueryDict):
+
+    if not isinstance(request.META, dict):
         return
 
-    username = request.DATA.get('username', None)
-    password = request.DATA.get('password', None)
-    events = request.DATA.get('events', None)
-    
-    if username and password and events:
+    username = request.META.get('HTTP_USERNAME', None)
+    password = request.META.get('HTTP_PASSWORD', None)
+
+    if username and password:
         request.user = authenticate(username=username, password=password)
         if not hasattr(request, 'user_group_ids'):
             request.user_group_ids = set()
@@ -86,9 +84,6 @@ def authenticate_and_overload(request):
             request.user_group_ids = request.user_group_ids.union(groups)
         mw = TLSRequestMiddleware()
         mw.process_request(request)
-        request._content_type = 'application/json'
-        request._stream = BytesIO(events.encode(HTTP_HEADER_ENCODING))
-        request._data, request._files = (Empty, Empty)
 
 
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
@@ -205,7 +200,7 @@ class TimeseriesDetail(APIDetailView):
 class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
     def post(self, request, uuid=None):
-        authenticate_and_overload(request)
+        authenticate_request(request)
 
         serializer = serializers.MultiEventListSerializer(data=request.DATA)
         if not serializer.is_valid():
@@ -219,7 +214,7 @@ class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
     def post(self, request, uuid=None):
-        authenticate_and_overload(request)
+        authenticate_request(request)
 
         serializer = serializers.EventListSerializer(data=request.DATA)
         if not serializer.is_valid():
