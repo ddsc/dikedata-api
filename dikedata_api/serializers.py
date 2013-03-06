@@ -154,7 +154,7 @@ class TimeseriesListSerializer(BaseSerializer):
 
     class Meta:
         model = Timeseries
-        fields = ('url', 'events', 'latest_value', 'name', 'value_type',
+        fields = ('url', 'uuid', 'events', 'latest_value', 'name', 'value_type',
                   'parameter', 'location', 'logical_groups')
 
 
