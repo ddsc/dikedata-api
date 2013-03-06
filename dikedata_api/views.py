@@ -10,7 +10,7 @@ from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
@@ -49,11 +49,8 @@ def write_events(user, data):
     series = {}
     permission = True
     for (uuid, df) in reader.get_series():
-        try:
-            ts = Timeseries.objects.get(uuid=uuid)
-            series[uuid] = (ts, df)
-        except Timeseries.DoesNotExist:
-            raise Http404("Geen timeseries gevonden die voldoen aan de query")
+        ts = Timeseries.objects.get(uuid=uuid)
+        series[uuid] = (ts, df)
         if not user.has_perm(PERMISSION_CHANGE, ts):
             permission = False
     if not permission:
@@ -76,6 +73,8 @@ def authenticate_request(request):
 
     if username and password:
         request.user = authenticate(username=username, password=password)
+        if not request.user:
+            raise PermissionDenied("Incorrect username/password.")
         if not hasattr(request, 'user_group_ids'):
             request.user_group_ids = set()
         if not request.user.is_anonymous():
@@ -216,6 +215,21 @@ class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
     def post(self, request, uuid=None):
         authenticate_request(request)
 
+        ts = Timeseries.objects.get(uuid=uuid)
+        if ts.is_file():
+            if not isinstance(request.META, dict):
+                raise ValidationError("Missing request header")
+            dt = request.META.get('HTTP_DATETIME', None)
+            if not dt:
+                raise ValidationError("Missing request header param")
+            timestamp = datetime.strptime(dt, COLNAME_FORMAT)
+            ts.set_file(timestamp, request.FILES)
+            data = {'datetime' : dt, 'value' : reverse('event-detail',
+                args=[uuid, dt], request=request)}
+            ts.save()
+            headers = self.get_success_headers(data)
+            return Response(data, status=201, headers=headers)
+
         serializer = serializers.EventListSerializer(data=request.DATA)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
@@ -226,11 +240,7 @@ class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
         return Response(serializer.data, status=201, headers=headers)
 
     def get(self, request, uuid=None, format=None):
-        # 404 on unknown timeseries
-        try:
-            ts = Timeseries.objects.get(uuid=uuid)
-        except Timeseries.DoesNotExist:
-            raise Http404("Geen timeseries gevonden die voldoen aan de query")
+        ts = Timeseries.objects.get(uuid=uuid)
 
         # grab GET parameters
         start = self.request.QUERY_PARAMS.get('start', None)
@@ -367,17 +377,11 @@ class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
         return line
 
 
-class EventDetail(APIView):
+class EventDetail(mixins.BaseMixin, APIView):
     def get(self, request, uuid=None, dt=None, format=None):
-        result = Timeseries.objects.filter(uuid=uuid)
-        if len(result) == 0:
-            raise Http404("Geen timeseries gevonden die voldoen aan de query")
-        ts = result[0]
+        ts = Timeseries.objects.get(uuid=uuid)
         timestamp = datetime.strptime(dt, FILENAME_FORMAT)
-        try:
-            (file_data, file_mime, file_size) = ts.get_file(timestamp)
-        except IOError:
-            raise Http404("File not found")
+        (file_data, file_mime, file_size) = ts.get_file(timestamp)
         response = HttpResponse(file_data, mimetype=file_mime)
         if file_mime is not None:
             response['Content-Type'] = file_mime
