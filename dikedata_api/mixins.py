@@ -10,8 +10,6 @@ from dikedata_api.exceptions import APIException
 
 
 class BaseMixin(object):
-    renderer_classes = (JSONRenderer, BrowsableAPIRenderer)
-
     def handle_exception(self, exc):
         wrapped = APIException(exc)
         return super(BaseMixin, self).handle_exception(wrapped)
