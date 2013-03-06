@@ -18,7 +18,7 @@ EXCEPTION_MAP = {
     'ValueError':            (200,  10, "Incorrect parameter value format."),
     # Functional problems
     'ParseError':            (400,  10, "Incorrect request format."),
-    'TypeError':             (400,  20, "Incorrect request content."),
+    'ValidationError':       (400,  30, "Incomplete request content."),
     'PermissionDenied':      (403,  10, "Permission denied."),
     'Http404':               (404,  10, "Resource not found."),
     'DoesNotExist':          (404,  10, "Resource not found."),
@@ -26,8 +26,10 @@ EXCEPTION_MAP = {
     # Technical problems
     'Exception':             (500,   0, "Unknown technical error."),
     'NameError':             (500,  20, "Technical error"),
+    'TypeError':             (500,  20, "Technical error."),
     'DatabaseError':         (500,  30, "Database error."),
     'FieldError':            (500,  30, "Database error."),
+    'IOError':               (500,  40, "Disk error."),
     'AllServersUnavailable': (502,  10, "External server unavailable."),
     'MaximumRetryException': (502,  20, "External server error"),
 }
@@ -48,7 +50,7 @@ class APIException(BaseException):
             (file, line, method, expr) = trace[-1]
             msg = '%s: %s in %s, line %d' % (
                 ex.__class__.__name__,
-                ', '.join(ex.args),
+                ', '.join(str(x) for x in ex.args),
                 file,
                 line
             )
