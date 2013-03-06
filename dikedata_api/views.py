@@ -380,6 +380,9 @@ class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 class EventDetail(mixins.BaseMixin, APIView):
     def get(self, request, uuid=None, dt=None, format=None):
         ts = Timeseries.objects.get(uuid=uuid)
+        if not ts.is_file():
+            raise ValidationError(
+                "Cannot GET single event detail of non-file timeseries.")
         timestamp = datetime.strptime(dt, FILENAME_FORMAT)
         (file_data, file_mime, file_size) = ts.get_file(timestamp)
         response = HttpResponse(file_data, mimetype=file_mime)
