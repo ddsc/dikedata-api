@@ -60,31 +60,6 @@ def write_events(user, data):
         ts.save()
 
 
-def authenticate_request(request):
-    # Sensors can authenticate by username and password in each request.
-    # When they do, a login is faked and the request stream is overloaded,
-    # forcing a re-parse of the event json data.
-
-    if not isinstance(request.META, dict):
-        return
-
-    username = request.META.get('HTTP_USERNAME', None)
-    password = request.META.get('HTTP_PASSWORD', None)
-
-    if username and password:
-        request.user = authenticate(username=username, password=password)
-        if not request.user:
-            raise PermissionDenied("Incorrect username/password.")
-        if not hasattr(request, 'user_group_ids'):
-            request.user_group_ids = set()
-        if not request.user.is_anonymous():
-            groups = request.user.user_group_memberships.values_list(
-                'id', flat=True)
-            request.user_group_ids = request.user_group_ids.union(groups)
-        mw = TLSRequestMiddleware()
-        mw.process_request(request)
-
-
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
                           generics.MultipleObjectAPIView):
     pass
@@ -196,11 +171,13 @@ class TimeseriesDetail(APIDetailView):
     slug_url_kwarg = 'uuid'
 
 
-class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
+class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
+    pass
+
+
+class MultiEventList(BaseEventView):
 
     def post(self, request, uuid=None):
-        authenticate_request(request)
-
         serializer = serializers.MultiEventListSerializer(data=request.DATA)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
@@ -210,12 +187,12 @@ class MultiEventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
         return Response(serializer.data, status=201, headers=headers)
 
 
-class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
+class EventList(BaseEventView):
 
     def post(self, request, uuid=None):
-        authenticate_request(request)
-
         ts = Timeseries.objects.get(uuid=uuid)
+        if not request.user.has_perm(PERMISSION_CHANGE, ts):
+            raise PermissionDenied('No change permission on timeseries')
         if ts.is_file():
             if not isinstance(request.META, dict):
                 raise ValidationError("Missing request header")
@@ -238,6 +215,7 @@ class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
         result = write_events(getattr(request, 'user', None), data)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=201, headers=headers)
+
 
     def get(self, request, uuid=None, format=None):
         ts = Timeseries.objects.get(uuid=uuid)
@@ -377,7 +355,8 @@ class EventList(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
         return line
 
 
-class EventDetail(mixins.BaseMixin, APIView):
+class EventDetail(BaseEventView):
+
     def get(self, request, uuid=None, dt=None, format=None):
         ts = Timeseries.objects.get(uuid=uuid)
         if not ts.is_file():
