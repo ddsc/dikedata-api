@@ -18,6 +18,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
+from rest_framework.renderers import JSONRenderer, BrowsableAPIRenderer
 
 import numpy as np
 
@@ -30,6 +31,7 @@ from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 
 from dikedata_api import mixins, serializers
 from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
+from dikedata_api.renderers import CSVRenderer
 
 from tslib.readers import ListReader
 
@@ -188,6 +190,7 @@ class MultiEventList(BaseEventView):
 
 
 class EventList(BaseEventView):
+    renderer_classes = JSONRenderer, BrowsableAPIRenderer, CSVRenderer;
 
     def post(self, request, uuid=None):
         ts = Timeseries.objects.get(uuid=uuid)
