@@ -217,13 +217,14 @@ class EventList(BaseEventView):
         return Response(serializer.data, status=201, headers=headers)
 
 
-    def get(self, request, uuid=None, format=None):
+    def get(self, request, uuid=None):
         ts = Timeseries.objects.get(uuid=uuid)
 
         # grab GET parameters
         start = self.request.QUERY_PARAMS.get('start', None)
         end = self.request.QUERY_PARAMS.get('end', None)
         filter = self.request.QUERY_PARAMS.get('filter', None)
+        format = self.request.QUERY_PARAMS.get('format', None)
         eventsformat = self.request.QUERY_PARAMS.get('eventsformat', None)
 
         # parse start and end date
@@ -240,11 +241,14 @@ class EventList(BaseEventView):
                 # use the alternative format
                 end = datetime.strptime(end, COLNAME_FORMAT_MS)
 
-        # only return in jQuery Flot compatible format when requested
-        if eventsformat is None:
+        if format == 'csv':
+            # in case of csv return a dataframe and let the renderer handle it
+            response = ts.get_events(start=start, end=end, filter=filter)
+        elif eventsformat is None:
             df = ts.get_events(start=start, end=end, filter=filter)
             response = self.format_default(request, ts, df)
         elif eventsformat == 'flot':
+            # only return in jQuery Flot compatible format when requested
             df = ts.get_events(start=start, end=end, filter=filter)
             response = self.format_flot(request, ts, df, start, end)
 
@@ -357,7 +361,7 @@ class EventList(BaseEventView):
 
 class EventDetail(BaseEventView):
 
-    def get(self, request, uuid=None, dt=None, format=None):
+    def get(self, request, uuid=None, dt=None):
         ts = Timeseries.objects.get(uuid=uuid)
         if not ts.is_file():
             raise ValidationError(
