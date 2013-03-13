@@ -20,7 +20,7 @@ EXCEPTION_MAP = {
     'ParseError':            (400,  10, "Incorrect request format."),
     'ValidationError':       (400,  30, "Incomplete request content."),
     'PermissionDenied':      (403,  10, "Permission denied."),
-    'AuthenticationFailed':  (403,  10, "Authentication failed."),
+    'AuthenticationFailed':  (403,  20, "Authentication failed."),
     'Http404':               (404,  10, "Resource not found."),
     'DoesNotExist':          (404,  10, "Resource not found."),
     'MethodNotAllowed':      (405,  10, "Request method not available."),
