@@ -30,4 +30,4 @@ class AuthenticationMiddleware(object):
                 django_login(request, user)
                 request._dont_enforce_csrf_checks = True
             except Exception as ex:
-                pass
+                setattr(request, 'AUTHENTICATION_EXCEPTION', ex)

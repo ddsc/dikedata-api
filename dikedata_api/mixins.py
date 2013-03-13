@@ -10,6 +10,11 @@ from dikedata_api.exceptions import APIException
 
 
 class BaseMixin(object):
+    def initial(self, request, *args, **kwargs):
+        if hasattr(request, 'AUTHENTICATION_EXCEPTION'):
+            raise getattr(request, 'AUTHENTICATION_EXCEPTION')
+        return super(BaseMixin, self).initial(request, *args, **kwargs)
+
     def handle_exception(self, exc):
         wrapped = APIException(exc)
         return super(BaseMixin, self).handle_exception(wrapped)
