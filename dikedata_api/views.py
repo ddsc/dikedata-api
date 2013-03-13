@@ -138,6 +138,9 @@ class LocationList(APIListView):
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
         if logicalgroup:
             kwargs['timeseries__logical_groups__in'] = logicalgroup.split(',')
+        has_geometry = self.request.QUERY_PARAMS.get('has_geometry', None)
+        if has_geometry == 'true':
+            kwargs['point_geometry__isnull'] = False
         return Location.objects.filter(**kwargs).distinct()
 
 
