@@ -21,6 +21,7 @@ EXCEPTION_MAP = {
     'ValidationError':       (400,  30, "Incomplete request content."),
     'PermissionDenied':      (403,  10, "Permission denied."),
     'AuthenticationFailed':  (403,  20, "Authentication failed."),
+    'AutheticationFailed':   (403,  20, "Authentication failed."),
     'Http404':               (404,  10, "Resource not found."),
     'DoesNotExist':          (404,  10, "Resource not found."),
     'MethodNotAllowed':      (405,  10, "Request method not available."),
@@ -48,7 +49,10 @@ class APIException(BaseException):
         if ex:
             exc_type, exc_value, exc_traceback = sys.exc_info()
             trace = traceback.extract_tb(exc_traceback)
-            (file, line, method, expr) = trace[-1]
+            if len(trace) > 0:
+                (file, line, method, expr) = trace[-1]
+            else:
+                (file, line, method, expr) = ("", 0, "", "")
             msg = '%s: %s in %s, line %d' % (
                 ex.__class__.__name__,
                 ', '.join(str(x) for x in ex.args),
