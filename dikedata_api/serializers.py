@@ -97,7 +97,7 @@ class SubSubLocationSerializer(BaseSerializer):
 
     class Meta:
         model = Location
-        fields = ('url', 'name', 'description', 'point_geometry')
+        fields = ('url', 'uuid', 'name', 'description', 'point_geometry')
 
 
 class SubLocationSerializer(SubSubLocationSerializer):
