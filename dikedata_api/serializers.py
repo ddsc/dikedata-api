@@ -167,6 +167,8 @@ class TimeseriesDetailSerializer(BaseSerializer):
         view_name='event-list', slug_field='uuid')
     value_type = serializers.Field('get_value_type')
     latest_value = fields.LatestValue(view_name='event-detail')
+    first_value_timestamp = fields.DateTimeField()
+    latest_value_timestamp = fields.DateTimeField()
 
     class Meta:
         model = Timeseries

@@ -1,8 +1,17 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from rest_framework import serializers
+from rest_framework import fields, serializers
 from rest_framework.reverse import reverse
+
+COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
+
+
+class DateTimeField(fields.Field):
+    def field_to_native(self, obj, field_name):
+        field = getattr(obj, field_name, None)
+        if field:
+            return field.strftime(COLNAME_FORMAT_MS)
 
 
 class RelatedField(serializers.ModelField):
