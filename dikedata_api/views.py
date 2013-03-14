@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
-FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%SZ'
+FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%S.%fZ'
 
 mimetypes.init()
 
@@ -205,7 +205,11 @@ class EventList(BaseEventView):
             dt = request.META.get('HTTP_DATETIME', None)
             if not dt:
                 raise ValidationError("Missing request header param")
-            timestamp = datetime.strptime(dt, COLNAME_FORMAT)
+            try:
+                timestamp = datetime.strptime(dt, COLNAME_FORMAT)
+            except ValueError:
+                # use the alternative format
+                timestamp = datetime.strptime(dt, COLNAME_FORMAT_MS)
             ts.set_file(timestamp, request.FILES)
             data = {'datetime' : dt, 'value' : reverse('event-detail',
                 args=[uuid, dt], request=request)}
@@ -264,7 +268,7 @@ class EventList(BaseEventView):
     def format_default(request, ts, df):
         if ts.is_file():
             events = [
-                dict([('datetime', timestamp.strftime(COLNAME_FORMAT)),
+                dict([('datetime', timestamp.strftime(COLNAME_FORMAT_MS)),
                     ('value', reverse('event-detail',
                     args=[ts.uuid, timestamp.strftime(FILENAME_FORMAT)],
                     request=request))])
@@ -272,7 +276,7 @@ class EventList(BaseEventView):
             ]
         else:
             events = [
-                dict([('datetime', timestamp.strftime(COLNAME_FORMAT))] +
+                dict([('datetime', timestamp.strftime(COLNAME_FORMAT_MS))] +
                     [(colname, row[i]) for i, colname in enumerate(df.columns)]
                 )
                 for timestamp, row in df.iterrows()
