@@ -128,10 +128,10 @@ class DataOwnerDetail(APIDetailView):
 
 class LocationList(APIListView):
     model = Location
-    serializer_class = serializers.LocationListSerializer
+    serializer_class = serializers.SubSubLocationSerializer
 
     def get_queryset(self):
-        kwargs = {'depth': 1}
+        kwargs = {}
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
             kwargs['timeseries__parameter__in'] = parameter.split(',')
