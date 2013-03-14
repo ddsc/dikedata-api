@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from django.http.multipartparser import parse_header
 from rest_framework.renderers import BaseRenderer
 
-COLNAME_FORMAT = '%Y-%m-%d %H:%M:%S'
+COLNAME_FORMAT = '%Y-%m-%d %H:%M:%S.%f'
 
 
 class CSVRenderer(BaseRenderer):
