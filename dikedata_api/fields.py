@@ -29,13 +29,19 @@ class ManyRelatedField(serializers.ModelField):
 class HyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
     def field_to_native(self, obj, field_name):
         method = getattr(obj, field_name)
-        return self.to_native(method())
+        try:
+            return self.to_native(method())
+        except:
+            pass
 
 
 class ManyHyperlinkedRelatedMethod(serializers.HyperlinkedRelatedField):
     def field_to_native(self, obj, field_name):
         method = getattr(obj, field_name)
-        return [self.to_native(item) for item in method()]
+        try:
+            return [self.to_native(item) for item in method()]
+        except:
+            pass
 
 
 class ManyHyperlinkedParents(serializers.HyperlinkedRelatedField):
