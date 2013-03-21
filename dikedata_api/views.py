@@ -15,6 +15,7 @@ from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
 from rest_framework import exceptions as ex, generics
+from rest_framework.parsers import JSONParser, FormParser
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -30,6 +31,7 @@ from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
 
 from dikedata_api import mixins, serializers
+from dikedata_api.parsers import CSVParser
 from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
 from dikedata_api.renderers import CSVRenderer
 
@@ -181,6 +183,7 @@ class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
 
 
 class MultiEventList(BaseEventView):
+    parser_classes = JSONParser, FormParser, CSVParser
 
     def post(self, request, uuid=None):
         serializer = serializers.MultiEventListSerializer(data=request.DATA)
@@ -193,7 +196,7 @@ class MultiEventList(BaseEventView):
 
 
 class EventList(BaseEventView):
-    renderer_classes = JSONRenderer, BrowsableAPIRenderer, CSVRenderer;
+    renderer_classes = JSONRenderer, BrowsableAPIRenderer, CSVRenderer
 
     def post(self, request, uuid=None):
         ts = Timeseries.objects.get(uuid=uuid)

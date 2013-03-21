@@ -14,3 +14,19 @@ class SimpleFileUploadParser(BaseParser):
         content = stream.read()
 
         return DataAndFiles({}, content)
+
+
+class CSVParser(BaseParser):
+
+    media_type = 'text/csv'
+
+    def parse(self, stream, media_type=None, parser_context=None):
+        content = [line.strip().split(';') \
+            for line in stream.read().split('\n') if line.strip()]
+
+        data = [{'uuid':row[1].strip('"'),
+                 'events':[{'datetime':row[0].strip('"'),
+                            'value':row[2].strip('"')}]}
+                for row in content]
+        
+        return DataAndFiles(data, None)
