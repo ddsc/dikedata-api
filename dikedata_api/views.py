@@ -10,11 +10,11 @@ from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.core.exceptions import ValidationError
 from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
-from rest_framework import generics
+from rest_framework import exceptions as ex, generics
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
@@ -46,7 +46,7 @@ mimetypes.init()
 
 def write_events(user, data):
     if user is None:
-        raise PermissionDenied("User not logged in.")
+        raise ex.NotAuthenticated("User not logged in.")
     reader = ListReader(data)
     series = {}
     permission = True
@@ -56,7 +56,7 @@ def write_events(user, data):
         if not user.has_perm(PERMISSION_CHANGE, ts):
             permission = False
     if not permission:
-        raise PermissionDenied("Permission denied")
+        raise ex.PermissionDenied("Permission denied")
     for uuid, (ts, df) in series.items():
         ts.set_events(df)
         ts.save()
@@ -198,7 +198,7 @@ class EventList(BaseEventView):
     def post(self, request, uuid=None):
         ts = Timeseries.objects.get(uuid=uuid)
         if not request.user.has_perm(PERMISSION_CHANGE, ts):
-            raise PermissionDenied('No change permission on timeseries')
+            raise ex.PermissionDenied('No change permission on timeseries')
         if ts.is_file():
             if not isinstance(request.META, dict):
                 raise ValidationError("Missing request header")
@@ -374,7 +374,7 @@ class EventDetail(BaseEventView):
     def get(self, request, uuid=None, dt=None):
         ts = Timeseries.objects.get(uuid=uuid)
         if not ts.is_file():
-            raise ValidationError(
+            raise MethodNotAllowed(
                 "Cannot GET single event detail of non-file timeseries.")
         timestamp = datetime.strptime(dt, FILENAME_FORMAT)
         (file_data, file_mime, file_size) = ts.get_file(timestamp)

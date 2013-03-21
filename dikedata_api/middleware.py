@@ -11,6 +11,8 @@ from django.contrib.auth import login as django_login
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from rest_framework.exceptions import AuthenticationFailed
+
 
 class AuthenticationMiddleware(object):
     def process_request(self, request):
@@ -22,6 +24,8 @@ class AuthenticationMiddleware(object):
             del request.META['HTTP_PASSWORD']
             try:
                 user = authenticate(username=username, password=password)
+                if not user:
+                    raise AuthenticationFailed()
                 django_login(request, user)
                 request._dont_enforce_csrf_checks = True
             except Exception as ex:
