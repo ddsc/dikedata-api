@@ -11,15 +11,17 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
+from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
 from rest_framework import exceptions as ex, generics
 from rest_framework.parsers import JSONParser, FormParser
+from rest_framework.renderers import JSONRenderer, BrowsableAPIRenderer
 from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
-from rest_framework.renderers import JSONRenderer, BrowsableAPIRenderer
+from rest_framework.pagination import PaginationSerializer
 
 import numpy as np
 
@@ -239,6 +241,7 @@ class EventList(BaseEventView):
         filter = self.request.QUERY_PARAMS.get('filter', None)
         format = self.request.QUERY_PARAMS.get('format', None)
         eventsformat = self.request.QUERY_PARAMS.get('eventsformat', None)
+        page_num = self.request.QUERY_PARAMS.get('page', 1)
 
         # parse start and end date
         if start is not None:
@@ -265,7 +268,22 @@ class EventList(BaseEventView):
             df = ts.get_events(start=start, end=end, filter=filter)
             response = self.format_flot(request, ts, df, start, end)
 
-        return Response(response)
+        ps = generics.MultipleObjectAPIView(request=request)
+        page_size = ps.get_paginate_by(None)
+        if not page_size:
+            return Response(response)
+        paginator = Paginator(response, page_size)
+        try:
+            page = paginator.page(page_num)
+        except PageNotAnInteger:
+            page = paginator.page(1)
+        except EmptyPage:
+            page = paginator.page(paginator.num_pages)
+
+        context = {'request':request}
+        serializer = PaginationSerializer(instance=page, context=context)
+
+        return Response(serializer.data)
 
     @staticmethod
     def format_default(request, ts, df):
