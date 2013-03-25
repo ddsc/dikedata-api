@@ -1,7 +1,8 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
+from ddsc_core.models import (Location, Timeseries, Parameter, LogicalGroup,
+    Alarm_Active)
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
@@ -88,6 +89,16 @@ class ParameterDetailSerializer(BaseSerializer):
         model = Parameter
         fields = ('id', 'url', 'code', 'description', 'cas_number', 'group',
             'sikb_id')
+
+class Alarm_ActiveListSerializer(BaseSerializer):
+
+    class Meta:
+        model = Alarm_Active
+
+class Alarm_ActiveDetailSerializer(BaseSerializer):
+
+    class Meta:
+        model = Alarm_Active
 
 
 class SubSubLocationSerializer(BaseSerializer):

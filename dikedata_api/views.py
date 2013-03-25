@@ -30,7 +30,8 @@ from tls import TLSRequestMiddleware
 from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.auth import PERMISSION_CHANGE
-from ddsc_core.models import Location, Timeseries, Parameter, LogicalGroup
+from ddsc_core.models import (Location, Timeseries, Parameter, LogicalGroup,
+    Alarm_Active)
 
 from dikedata_api import mixins, serializers
 from dikedata_api.parsers import CSVParser
@@ -449,3 +450,13 @@ class LogicalGroupList(APIListView):
 class LogicalGroupDetail(APIDetailView):
     model = LogicalGroup
     serializer_class = serializers.LogicalGroupDetailSerializer
+
+
+class AlarmList(APIListView):
+    model = Alarm_Active
+    serializer_class = serializers.Alarm_ActiveDetailSerializer
+
+
+class AlarmDetail(APIDetailView):
+    model = Alarm_Active
+    serializer_class = serializers.Alarm_ActiveDetailSerializer

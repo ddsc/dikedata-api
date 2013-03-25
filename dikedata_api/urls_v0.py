@@ -69,4 +69,13 @@ urlpatterns = patterns(
     url(r'^logicalgroups/(?P<pk>[^/]+)/?$',
         views.LogicalGroupDetail.as_view(),
         name='logicalgroup-detail'),
+    url(r'^alarms/?$',
+        views.AlarmList.as_view(),
+        name='alarm-list'),
+    url(r'^alarms/(?P<pk>[^/]+)/?$',
+        views.AlarmDetail.as_view(),
+        name='alarm-detail'),
+    url(r'^alarms/(?P<pk>[^/]+)/?$',
+        views.AlarmDetail.as_view(),
+        name='alarm_active-detail'),
 )
