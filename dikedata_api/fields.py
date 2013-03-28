@@ -7,6 +7,14 @@ from rest_framework.reverse import reverse
 COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
 
 
+class AquoField(fields.Field):
+    class Meta:
+        fields = ('id', 'code', 'description')
+    
+    def to_native(self, obj):
+        return dict([(k, getattr(obj, k, None)) for k in self.Meta.fields])
+
+
 class DateTimeField(fields.Field):
     def field_to_native(self, obj, field_name):
         field = getattr(obj, field_name, None)
