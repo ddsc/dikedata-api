@@ -11,8 +11,8 @@ admin.autodiscover()
 
 urlpatterns = patterns(
     '',
-    url(r'^$', redirect_to, {'url': 'v0'}),
-    url(r'^v0/', include('dikedata_api.urls_v0'), name='v0'),
+    url(r'^$', redirect_to, {'url': 'v1'}),
+    url(r'^v1/', include('dikedata_api.urls_v1'), name='v1'),
     url(r'^auth/', include('rest_framework.urls', namespace='rest_framework'))
 )
 
