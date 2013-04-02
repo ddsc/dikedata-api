@@ -31,9 +31,9 @@ from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import (Location, Timeseries, Parameter, LogicalGroup,
-    Alarm_Active)
+    Alarm_Active, Alarm_Item, Alarm)
 
-from dikedata_api import mixins, serializers
+from dikedata_api import mixins, serializers, filters
 from dikedata_api.parsers import CSVParser
 from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
 from dikedata_api.renderers import CSVRenderer
@@ -452,11 +452,16 @@ class LogicalGroupDetail(APIDetailView):
     serializer_class = serializers.LogicalGroupDetailSerializer
 
 
-class AlarmList(APIListView):
+class AlarmActiveList(APIListView):
+    model = Alarm_Active
+    serializer_class = serializers.Alarm_ActiveListSerializer
+
+
+class AlarmActiveDetail(APIDetailView):
     model = Alarm_Active
     serializer_class = serializers.Alarm_ActiveDetailSerializer
 
 
 class AlarmDetail(APIDetailView):
-    model = Alarm_Active
-    serializer_class = serializers.Alarm_ActiveDetailSerializer
+    model = Alarm
+    serializer_class = serializers.AlarmDetailSerializer

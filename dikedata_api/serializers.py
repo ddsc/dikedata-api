@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 from ddsc_core.models import (Location, Timeseries, Parameter, LogicalGroup,
-    Alarm_Active)
+    Alarm_Active, Alarm_Item, Alarm)
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
@@ -90,15 +90,43 @@ class ParameterDetailSerializer(BaseSerializer):
         fields = ('id', 'url', 'code', 'description', 'cas_number', 'group',
             'sikb_id')
 
+
 class Alarm_ActiveListSerializer(BaseSerializer):
 
     class Meta:
         model = Alarm_Active
 
+
+class AlarmDetailSerializer(BaseSerializer):
+    # alarm = serializers.SerializerMethodField('get_alarm_type')
+
+    class Meta:
+        model = Alarm
+        depth = 2
+        exclude = ('single_or_group')
+
 class Alarm_ActiveDetailSerializer(BaseSerializer):
+    alarm = AlarmDetailSerializer()
+
+    alarm_type = serializers.SerializerMethodField('get_alarm_type')
+ #   alarm_type = fields.HyperlinkedRelatedMethod(view_name='actieudfhi-detail', read_only=True)
+
+    def get_alarm_type(self, obj):
+        try: 
+            alarmitems = obj.alarm.alarm_item_set.get()
+            alarm_type = alarmitems.alarm_type
+        except:
+            alarm_object = 'No Alarm type found'
+            return alarm_object
+        try:
+            alarm_object = alarm_type.get_object_for_this_type()
+        except:
+            alarm_object = 'invalid instance of {}'.format(alarm_type)
+        return alarm_object
 
     class Meta:
         model = Alarm_Active
+        depth = 2
 
 
 class SubSubLocationSerializer(BaseSerializer):
