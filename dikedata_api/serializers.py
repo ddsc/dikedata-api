@@ -103,13 +103,10 @@ class AlarmDetailSerializer(BaseSerializer):
     class Meta:
         model = Alarm
         depth = 2
-        exclude = ('single_or_group')
 
 class Alarm_ActiveDetailSerializer(BaseSerializer):
     alarm = AlarmDetailSerializer()
-
     alarm_type = serializers.SerializerMethodField('get_alarm_type')
- #   alarm_type = fields.HyperlinkedRelatedMethod(view_name='actieudfhi-detail', read_only=True)
 
     def get_alarm_type(self, obj):
         try: 
