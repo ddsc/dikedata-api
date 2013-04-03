@@ -30,10 +30,9 @@ from tls import TLSRequestMiddleware
 from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.auth import PERMISSION_CHANGE
-from ddsc_core.models import (Location, Timeseries, Parameter, LogicalGroup,
-    Alarm_Active, Alarm_Item, Alarm)
-
-from dikedata_api import mixins, serializers, filters
+from ddsc_core.models import (Alarm, Alarm_Active, Location, LogicalGroup, Source,
+                              Timeseries)
+from dikedata_api import mixins, serializers
 from dikedata_api.parsers import CSVParser
 from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
 from dikedata_api.renderers import CSVRenderer
@@ -412,24 +411,9 @@ class EventDetail(BaseEventView):
         return response
 
 
-class ParameterList(APIReadOnlyListView):
-    model = Parameter
-    serializer_class = serializers.ParameterListSerializer
-
-    def get_queryset(self):
-        kwargs = {'group' : 'Grootheid'}
-        logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
-        if logicalgroup:
-            kwargs['timeseries__logical_groups__in'] = logicalgroup.split(',')
-        location = self.request.QUERY_PARAMS.get('location', None)
-        if location:
-            kwargs['timeseries__location__uuid__in'] = location.split(',')
-        return Parameter.objects.filter(**kwargs).distinct()
-
-
-class ParameterDetail(APIDetailView):
-    model = Parameter
-    serializer_class = serializers.ParameterDetailSerializer
+class SourceList(APIListView):
+    model = Source
+    serializer_class = serializers.SourceListSerializer
 
 
 class LogicalGroupList(APIListView):

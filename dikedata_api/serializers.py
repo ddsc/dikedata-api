@@ -1,8 +1,8 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import (Location, Timeseries, Parameter, LogicalGroup,
-    Alarm_Active, Alarm_Item, Alarm)
+from ddsc_core.models import (Alarm, Alarm_Active, Location, LogicalGroup,
+                              Manufacturer, Timeseries, Source )
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
@@ -76,19 +76,21 @@ class DataOwnerDetailSerializer(BaseSerializer):
         model = DataOwner
 
 
-class ParameterListSerializer(BaseSerializer):
+class ManufacturerListSerializer(BaseSerializer):
 
     class Meta:
-        model = Parameter
-        fields = ('id', 'url', 'code', 'description')
+        model = Manufacturer
+        fields = ('code', 'name')
 
 
-class ParameterDetailSerializer(BaseSerializer):
+class SourceListSerializer(BaseSerializer):
+    manufacturer = ManufacturerListSerializer()
 
     class Meta:
-        model = Parameter
-        fields = ('id', 'url', 'code', 'description', 'cas_number', 'group',
-            'sikb_id')
+        model = Source
+        fields = ('name', 'source_type', 'manufacturer')
+        depth = 1
+
 
 
 class Alarm_ActiveListSerializer(BaseSerializer):
@@ -109,7 +111,7 @@ class Alarm_ActiveDetailSerializer(BaseSerializer):
     alarm_type = serializers.SerializerMethodField('get_alarm_type')
 
     def get_alarm_type(self, obj):
-        try: 
+        try:
             alarmitems = obj.alarm.alarm_item_set.get()
             alarm_type = alarmitems.alarm_type
         except:
@@ -173,7 +175,6 @@ class LocationDetailSerializer(SubSubLocationSerializer):
             'point_geometry',
             'uuid',
             'name',
-            'description',
         )
 
 
@@ -205,6 +206,14 @@ class TimeseriesDetailSerializer(BaseSerializer):
     latest_value = fields.LatestValue(view_name='event-detail')
     first_value_timestamp = fields.DateTimeField()
     latest_value_timestamp = fields.DateTimeField()
+    source = SourceListSerializer()
+    parameter = fields.AquoField()
+    unit = fields.AquoField()
+    reference_frame = fields.AquoField()
+    compartment = fields.AquoField()
+    measuring_device = fields.AquoField()
+    measuring_method = fields.AquoField()
+    processing_method = fields.AquoField()
 
     class Meta:
         model = Timeseries
@@ -223,6 +232,12 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'latest_value_timestamp',
             'supplying_systems',
             'parameter',
+            'unit',
+            'reference_frame',
+            'compartment',
+            'measuring_device',
+            'measuring_method',
+            'processing_method',
         )
         depth = 1
 
