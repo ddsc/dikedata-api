@@ -278,28 +278,27 @@ class EventList(BaseEventView):
             response = ts.get_events(start=start, end=end, filter=filter)
         elif eventsformat is None:
             df = ts.get_events(start=start, end=end, filter=filter)
-            response = self.format_default(request, ts, df)
+            all = self.format_default(request, ts, df)
+            ps = generics.MultipleObjectAPIView(request=request)
+            page_size = ps.get_paginate_by(None)
+            if not page_size:
+                return Response(all)
+            paginator = Paginator(all, page_size)
+            try:
+                page = paginator.page(page_num)
+            except PageNotAnInteger:
+                page = paginator.page(1)
+            except EmptyPage:
+                page = paginator.page(paginator.num_pages)
+            context = {'request':request}
+            serializer = PaginationSerializer(instance=page, context=context)
+            response = serializer.data
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
             df = ts.get_events(start=start, end=end, filter=filter)
             response = self.format_flot(request, ts, df, start, end)
 
-        ps = generics.MultipleObjectAPIView(request=request)
-        page_size = ps.get_paginate_by(None)
-        if not page_size:
-            return Response(response)
-        paginator = Paginator(response, page_size)
-        try:
-            page = paginator.page(page_num)
-        except PageNotAnInteger:
-            page = paginator.page(1)
-        except EmptyPage:
-            page = paginator.page(paginator.num_pages)
-
-        context = {'request':request}
-        serializer = PaginationSerializer(instance=page, context=context)
-
-        return Response(serializer.data)
+        return Response(response)
 
     @staticmethod
     def format_default(request, ts, df):
