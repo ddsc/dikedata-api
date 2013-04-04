@@ -5,6 +5,7 @@ from datetime import datetime
 import calendar
 import logging
 import mimetypes
+import time
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login
@@ -54,8 +55,11 @@ def write_events(user, data):
     reader = ListReader(data)
     series = {}
     permission = True
+    locations = {}
+    total = 0
     for (uuid, df) in reader.get_series():
         ts = Timeseries.objects.get(uuid=uuid)
+        locations[ts.location_id] = 1
         series[uuid] = (ts, df)
         if not user.has_perm(PERMISSION_CHANGE, ts):
             permission = False
@@ -63,7 +67,9 @@ def write_events(user, data):
         raise ex.PermissionDenied("Permission denied")
     for uuid, (ts, df) in series.items():
         ts.set_events(df)
+        total += len(df)
         ts.save()
+    return total, len(series), len(locations)
 
 
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
@@ -188,12 +194,17 @@ class MultiEventList(BaseEventView):
     parser_classes = JSONParser, FormParser, CSVParser
 
     def post(self, request, uuid=None):
+        start = time.time()
         serializer = serializers.MultiEventListSerializer(data=request.DATA)
         if not serializer.is_valid():
             return Response(serializer.errors, status=400)
 
-        result = write_events(getattr(request, 'user', None), serializer.data)
+        e, t, l = write_events(getattr(request, 'user', None), serializer.data)
         headers = self.get_success_headers(serializer.data)
+        elapsed = (time.time() - start) * 1000
+        logger.info("POST: Wrote %d events for %d timeseries at %d locations " \
+                    "in %d ms for user %s" %
+                    (e, t, l, elapsed, getattr(request, 'user', None)))
         return Response(serializer.data, status=201, headers=headers)
 
 
@@ -201,6 +212,7 @@ class EventList(BaseEventView):
     renderer_classes = JSONRenderer, BrowsableAPIRenderer, CSVRenderer
 
     def post(self, request, uuid=None):
+        start = time.time()
         ts = Timeseries.objects.get(uuid=uuid)
         if not request.user.has_perm(PERMISSION_CHANGE, ts):
             raise ex.PermissionDenied('No change permission on timeseries')
@@ -227,8 +239,12 @@ class EventList(BaseEventView):
             return Response(serializer.errors, status=400)
 
         data = [{"uuid": uuid, "events": serializer.data}]
-        result = write_events(getattr(request, 'user', None), data)
+        e, t, l = write_events(getattr(request, 'user', None), data)
         headers = self.get_success_headers(serializer.data)
+        elapsed = (time.time() - start) * 1000
+        logger.info("POST: Wrote %d events for %d timeseries at %d locations " \
+                    "in %d ms for user %s" %
+                    (e, t, l, elapsed, getattr(request, 'user', None)))
         return Response(serializer.data, status=201, headers=headers)
 
 
