@@ -176,6 +176,9 @@ class TimeseriesList(APIListView):
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
             kwargs['parameter__in'] = parameter.split(',')
+        value_type = self.request.QUERY_PARAMS.get('value_type', None)
+        if value_type:
+            kwargs['value_type__in'] = value_type.split(',')
         return Timeseries.objects.filter(**kwargs).distinct()
 
 
