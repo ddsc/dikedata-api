@@ -230,7 +230,6 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'owner',
             'first_value_timestamp',
             'latest_value_timestamp',
-            'supplying_systems',
             'parameter',
             'unit',
             'reference_frame',
