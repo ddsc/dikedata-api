@@ -179,6 +179,9 @@ class TimeseriesList(APIListView):
         value_type = self.request.QUERY_PARAMS.get('value_type', None)
         if value_type:
             kwargs['value_type__in'] = value_type.split(',')
+        name = self.request.QUERY_PARAMS.get('name', None)
+        if name:
+            kwargs['name__istartswith'] = name
         return Timeseries.objects.filter(**kwargs).distinct()
 
 
