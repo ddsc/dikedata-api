@@ -15,9 +15,10 @@ EXCEPTION_MAP = {
     #                        HTTP CODE  DESCRIPTION
     #                        ==== ===== ===========
     # Interface problems
-    'ValueError':            (200,  10, "Incorrect parameter value format."),
+    'ValueError':            (400,  10, "Incorrect parameter value format."),
     # Functional problems
     'ParseError':            (400,  10, "Incorrect request format."),
+    'InvalidKey':            (400,  11, "Invalid key in request."),
     'ValidationError':       (400,  20, "Incomplete request content."),
     'NotAuthenticated':      (401,  10, "Not authenticated"),
     'AuthenticationFailed':  (401,  20, "Authentication failed."),

@@ -6,6 +6,7 @@ import calendar
 import logging
 import mimetypes
 import time
+import json
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login
@@ -23,6 +24,7 @@ from rest_framework.response import Response
 from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 from rest_framework.pagination import PaginationSerializer
+from rest_framework.exceptions import ParseError
 
 import numpy as np
 
@@ -47,6 +49,65 @@ COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
 FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%S.%fZ'
 
 mimetypes.init()
+
+
+BOOL_LOOKUPS = ("isnull",)
+INT_LOOKUPS = ("year", "month", "day", "week_day",)
+STR_LOOKUPS = ("contains", "icontains", "startswith", "istartswith", "endswith", "iendswith", "search", "regex", "iregex",)
+ALL_LOOKUPS = BOOL_LOOKUPS + INT_LOOKUPS + STR_LOOKUPS + ("exact", "iexact", "gt", "gte", "lt", "lte",)
+
+
+class InvalidKey(ParseError):
+    def __init__(self, key):
+        message = "Unknown field or lookup: %s." % key
+        super(ParseError, self).__init__(message)
+
+
+def customfilter(view, qs, filter_json):
+    """
+    Function for adding filters to queryset.
+    set 'customfilter_fields for allowed fields'
+    :param view:                view (self)
+    :param qs:                  queryset
+    :param filter_json:         raw_json of filter key. example is '{"name__contains": "bla", "uuid__startswith": "7"}'
+    :return:
+    """
+
+    exclude = False
+
+    filter_dict = json.loads(filter_json)
+    for key, value in filter_dict.items():
+
+        print key
+        print value
+
+        #get key and lookup
+        possible_lookup = key.rsplit('__',1)
+        if possible_lookup[1] in ALL_LOOKUPS:
+            key = possible_lookup[0]
+            lookup = possible_lookup[1]
+        else:
+            lookup = 'exact'
+
+        #check on include or exclude
+        if key.startswith('-'):
+            exclude = True
+            key = key.lstrip('-')
+
+        #check if key is allowed
+        if not key in view.customfilter_fields:
+            raise InvalidKey(key)
+
+        if value:
+            if exclude:
+                qs = qs.exclude(**{'%s__%s' % (key, lookup): value})
+            else:
+                qs = qs.filter(**{'%s__%s' % (key, lookup): value})
+    return qs
+
+
+def order_by(view, qs, filter):
+    pass
 
 
 def write_events(user, data):
@@ -140,8 +201,16 @@ class LocationList(APIListView):
     model = Location
     serializer_class = serializers.SubSubLocationSerializer
 
+    customfilter_fields = ('uuid', 'name')
+
     def get_queryset(self):
         kwargs = {}
+        qs = Location.objects
+
+        filter = self.request.QUERY_PARAMS.get('filter', None)
+        if filter:
+            qs = customfilter(self, qs, filter)
+
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
             kwargs['timeseries__parameter__in'] = parameter.split(',')
@@ -151,7 +220,7 @@ class LocationList(APIListView):
         has_geometry = self.request.QUERY_PARAMS.get('has_geometry', None)
         if has_geometry == 'true':
             kwargs['point_geometry__isnull'] = False
-        return Location.objects.filter(**kwargs).distinct()
+        return qs.filter(**kwargs).distinct()
 
 
 class LocationDetail(APIDetailView):
@@ -165,8 +234,16 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
+    customfilter_fields = ('uuid', 'name')
+
     def get_queryset(self):
         kwargs = {}
+        qs = Timeseries.objects
+
+        filter = self.request.QUERY_PARAMS.get('filter', None)
+        if filter:
+            qs = customfilter(self, qs, filter)
+
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
         if logicalgroup:
             kwargs['logical_groups__in'] = logicalgroup.split(',')
@@ -179,7 +256,7 @@ class TimeseriesList(APIListView):
         value_type = self.request.QUERY_PARAMS.get('value_type', None)
         if value_type:
             kwargs['value_type__in'] = value_type.split(',')
-        return Timeseries.objects.filter(**kwargs).distinct()
+        return qs.filter(**kwargs).distinct()
 
 
 class TimeseriesDetail(APIDetailView):
