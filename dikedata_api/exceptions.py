@@ -30,6 +30,7 @@ EXCEPTION_MAP = {
     'Exception':             (500,   0, "Unknown technical error."),
     'NameError':             (500,  10, "Technical error"),
     'TypeError':             (500,  11, "Technical error."),
+    'UnboundLocalError':     (500,  12, "Technical error."),
     'DatabaseError':         (500,  20, "Database error."),
     'FieldError':            (500,  21, "Database error."),
     'IOError':               (500,  30, "Disk error."),
