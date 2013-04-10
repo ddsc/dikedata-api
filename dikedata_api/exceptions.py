@@ -14,11 +14,10 @@ logger = logging.getLogger(__name__)
 EXCEPTION_MAP = {
     #                        HTTP CODE  DESCRIPTION
     #                        ==== ===== ===========
-    # Interface problems
-    'ValueError':            (400,  10, "Incorrect parameter value format."),
     # Functional problems
     'ParseError':            (400,  10, "Incorrect request format."),
     'InvalidKey':            (400,  11, "Invalid key in request."),
+    'ValueError':            (400,  12, "Incorrect parameter value format."),
     'ValidationError':       (400,  20, "Incomplete request content."),
     'NotAuthenticated':      (401,  10, "Not authenticated"),
     'AuthenticationFailed':  (401,  20, "Authentication failed."),
