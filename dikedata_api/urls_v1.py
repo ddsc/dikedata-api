@@ -69,9 +69,19 @@ urlpatterns = patterns(
     url(r'^alarms/(?P<pk>[^/]+)/?$',
         views.AlarmActiveDetail.as_view(),
         name='alarm_active-detail'),
-    url(r'^alarmdetail/(?P<pk>[^/]+)/?$',
-        views.AlarmDetail.as_view(),
+    url(r'^alarmsettings/?$',
+        views.AlarmSettingList.as_view(),
+        name='alarm-list'),
+    url(r'^alarmsettings/(?P<pk>[^/]+)/?$',
+        views.AlarmSettingDetail.as_view(),
         name='alarm-detail'),
+    url(r'^alarmitems/(?P<pk>[^/]+)/?$',
+        views.AlarmItemDetail.as_view(),
+        name='alarm_item-detail'),
+
+
+
+
     url(r'^sources/?$',
         views.SourceList.as_view(),
         name='source-list'),

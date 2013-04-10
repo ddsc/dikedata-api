@@ -33,7 +33,7 @@ from tls import TLSRequestMiddleware
 from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.auth import PERMISSION_CHANGE
-from ddsc_core.models import (Alarm, Alarm_Active, Location, LogicalGroup, Source,
+from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, Source,
                               Timeseries)
 from dikedata_api import mixins, serializers
 from dikedata_api.parsers import CSVParser
@@ -541,6 +541,14 @@ class AlarmActiveDetail(APIDetailView):
     serializer_class = serializers.Alarm_ActiveDetailSerializer
 
 
-class AlarmDetail(APIDetailView):
+class AlarmSettingList(APIListView):
     model = Alarm
-    serializer_class = serializers.AlarmDetailSerializer
+    serializer_class = serializers.AlarmSettingListSerializer
+
+class AlarmSettingDetail(APIDetailView):
+    model = Alarm
+    serializer_class = serializers.AlarmSettingDetailSerializer
+
+class AlarmItemDetail(APIDetailView):
+    model = Alarm_Item
+    serializer_class = serializers.AlarmItemDetailSerializer

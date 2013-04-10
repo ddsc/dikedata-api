@@ -73,3 +73,15 @@ class LatestValue(serializers.HyperlinkedIdentityField):
                     request=self.context['request'])
             return None
         return obj.latest_value()
+
+class DictChoiceField(serializers.ChoiceField):
+    def to_native(self, value):
+        #get display value
+        choices_dict = dict(self._choices)
+        return choices_dict[value]
+
+    def from_native(self, value):
+        #get value from display value (assuming that display values are unique)
+        choices_dict = dict([(a[1],a[0]) for a in self._choices])
+        print choices_dict[value]
+        return choices_dict[value]

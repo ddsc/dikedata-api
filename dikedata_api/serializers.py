@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import (Alarm, Alarm_Active, Location, LogicalGroup,
+from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup,
                               Manufacturer, Timeseries, Source )
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
@@ -126,6 +126,56 @@ class Alarm_ActiveDetailSerializer(BaseSerializer):
     class Meta:
         model = Alarm_Active
         depth = 2
+
+
+class AlarmItemDetailSerializer(BaseSerializer):
+
+    comparision = fields.DictChoiceField(choices=Alarm_Item.COMPARISION_TYPE)
+    logical_check = fields.DictChoiceField(choices=Alarm_Item.LOGIC_TYPES)
+    value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
+    alarm_type = fields.DictChoiceField(choices=Alarm_Item.ALARM_TYPE)
+    alarm_type = fields.RelatedField(model_field='name')
+
+    class Meta:
+        model = Alarm_Item
+        #depth = 2
+        #fields = ('comparision', 'logical_check')
+        exclude = ('alarm', )
+
+
+class AlarmSettingDetailSerializer(BaseSerializer):
+    alarm_item_set = AlarmItemDetailSerializer(many=True, read_only=True)
+
+    frequency = fields.DictChoiceField(choices=Alarm.FREQUENCY_TYPE)
+    urgency = fields.DictChoiceField(choices=Alarm.URGENCY_TYPE)
+    logical_check = fields.DictChoiceField(choices=Alarm.LOGIC_TYPES)
+    message_type = fields.DictChoiceField(choices=Alarm.MESSAGE_TYPE)
+
+    class Meta:
+        model = Alarm
+        exclude = ('single_or_group', )
+
+
+class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
+
+    url = serializers.HyperlinkedIdentityField(
+        view_name='alarm-detail')
+
+    class Meta:
+        model = Alarm
+        fields = (
+            'url',
+            'id',
+            'name',
+            #'single_or_group',
+            'object_id',
+            'frequency',
+            'urgency',
+            'message_type',
+            'active_status',
+        )
+
+
 
 
 class SubSubLocationSerializer(BaseSerializer):
