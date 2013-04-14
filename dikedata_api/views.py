@@ -545,9 +545,45 @@ class AlarmSettingList(APIListView):
     model = Alarm
     serializer_class = serializers.AlarmSettingListSerializer
 
+
 class AlarmSettingDetail(APIDetailView):
     model = Alarm
     serializer_class = serializers.AlarmSettingDetailSerializer
+
+    def post_save(self, obj, created=True):
+        """
+            custom function for saving nested alarm items
+            This save method is not transaction save and without validation on the alarm_items.
+            Please refactor this function when write support is added to django rest framework
+            (work in progress at this moment)
+        """
+        cur_alarm_items = dict([(item.id, item) for item in obj.alarm_item_set.all()])
+
+        req_alarm_items = self.request.DATA.getlist('alarm_item_set')
+
+        print self.request.method
+
+        for item in req_alarm_items:
+            item = json.loads(item)
+            if self.request.method == 'PUT' or not 'id' in item or item['id'] is None:
+                #create item
+                item['alarm_id'] = obj.id
+                alarm_item = serializers.AlarmItemDetailSerializer(None, data=item)
+                alarm_item.is_valid()
+                alarm_item.save()
+
+            elif item['id'] in cur_alarm_items:
+                #update
+                cur_item = cur_alarm_items[item['id']]
+                alarm_item = serializers.AlarmItemDetailSerializer(cur_item, data=item)
+                alarm_item.is_valid()
+                alarm_item.save()
+                del cur_alarm_items[item['id']]
+
+        #delete the leftovers
+        for alarm_item in cur_alarm_items.values():
+            alarm_item.delete()
+
 
 class AlarmItemDetail(APIDetailView):
     model = Alarm_Item

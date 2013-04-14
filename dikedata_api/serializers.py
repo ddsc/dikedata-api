@@ -1,13 +1,14 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup,
+from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge,
                               Manufacturer, Timeseries, Source )
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from lizard_security.models import DataOwner, DataSet, UserGroup
+from django.contrib.contenttypes.models import ContentType
 
 
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
@@ -128,24 +129,26 @@ class Alarm_ActiveDetailSerializer(BaseSerializer):
         depth = 2
 
 
+class ModelRefSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = ContentType
+
+
 class AlarmItemDetailSerializer(BaseSerializer):
 
     comparision = fields.DictChoiceField(choices=Alarm_Item.COMPARISION_TYPE)
     logical_check = fields.DictChoiceField(choices=Alarm_Item.LOGIC_TYPES)
     value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
-    alarm_type = fields.DictChoiceField(choices=Alarm_Item.ALARM_TYPE)
-    alarm_type = fields.RelatedField(model_field='name')
+    alarm_type = ModelRefSerializer(slug_field = 'name')
 
     class Meta:
         model = Alarm_Item
-        #depth = 2
-        #fields = ('comparision', 'logical_check')
         exclude = ('alarm', )
 
 
 class AlarmSettingDetailSerializer(BaseSerializer):
     alarm_item_set = AlarmItemDetailSerializer(many=True, read_only=True)
-
     frequency = fields.DictChoiceField(choices=Alarm.FREQUENCY_TYPE)
     urgency = fields.DictChoiceField(choices=Alarm.URGENCY_TYPE)
     logical_check = fields.DictChoiceField(choices=Alarm.LOGIC_TYPES)
@@ -154,6 +157,7 @@ class AlarmSettingDetailSerializer(BaseSerializer):
     class Meta:
         model = Alarm
         exclude = ('single_or_group', )
+        read_only = ('previous_alarm')
 
 
 class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
@@ -174,8 +178,6 @@ class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
             'message_type',
             'active_status',
         )
-
-
 
 
 class SubSubLocationSerializer(BaseSerializer):
@@ -254,7 +256,7 @@ class TimeseriesListSerializer(BaseSerializer):
 
     class Meta:
         model = Timeseries
-        fields = ('url', 'uuid', 'events', 'latest_value', 'name', 'value_type',
+        fields = ('id', 'url', 'uuid', 'events', 'latest_value', 'name', 'value_type',
                   'parameter', 'location', 'logical_groups')
 
 
@@ -360,19 +362,59 @@ class MultiEventListSerializer(serializers.Serializer):
         return obj
 
 
-class LogicalGroupListSerializer(BaseSerializer):
-    class Meta:
-        model = LogicalGroup
-        fields = ('id', 'url', 'name',)
+class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
 
+    class Meta:
+        model = Timeseries
+
+    def field_to_native(self, obj, field):
+        #get display value
+        return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
+
+
+
+
+class LogicalGroupParentRefSerializer(BaseSerializer):
+
+    name = serializers.SerializerMethodField('get_name')
+
+    def get_name(self, obj):
+        return obj.parent.name
+
+    class Meta:
+        model = LogicalGroupEdge
+        fields = ('id', 'parent', 'name')
+
+
+    # def field_to_native(self, obj, field):
+    #     """
+    #         return dict representation of model
+    #     """
+    #     return [{'url': t.parent, 'name': t.parent.name} for t in getattr(obj, field).all()]
+
+
+class DataOwnerRefSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = DataOwner
 
 class LogicalGroupDetailSerializer(BaseSerializer):
-    timeseries = serializers.ManyHyperlinkedRelatedField(
-        view_name='timeseries-detail', slug_field='uuid')
-    parents = fields.ManyHyperlinkedParents(
-        view_name='logicalgroup-detail', read_only=True)
+    id = serializers.Field('id')
+    timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
+    parents = LogicalGroupParentRefSerializer(many=True, read_only=True)
     childs = fields.ManyHyperlinkedChilds(
         view_name='logicalgroup-detail', read_only=True)
+    owner = DataOwnerRefSerializer(slug_field='name')
 
     class Meta:
         model = LogicalGroup
+
+
+class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
+
+    parents = fields.ManyHyperlinkedParents(many=True,
+        view_name='logicalgroup-detail', slug_field='id')
+
+    class Meta:
+        model = LogicalGroup
+        fields = ('id', 'url', 'name', 'parents')
