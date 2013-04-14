@@ -156,8 +156,8 @@ class AlarmSettingDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Alarm
-        exclude = ('single_or_group', )
-        read_only = ('previous_alarm')
+        exclude = ('single_or_group', 'previous_alarm', )
+        read_only = ('previous_alarm', )
 
 
 class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
@@ -372,19 +372,20 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
         return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
 
 
-
-
 class LogicalGroupParentRefSerializer(BaseSerializer):
 
     name = serializers.SerializerMethodField('get_name')
+    parent_id = serializers.SerializerMethodField('get_parent_id')
 
     def get_name(self, obj):
         return obj.parent.name
 
+    def get_parent_id(self, obj):
+        return obj.parent.id
+
     class Meta:
         model = LogicalGroupEdge
-        fields = ('id', 'parent', 'name')
-
+        fields = ('id', 'parent', 'name', 'parent_id')
 
     # def field_to_native(self, obj, field):
     #     """
@@ -397,6 +398,7 @@ class DataOwnerRefSerializer(serializers.SlugRelatedField):
 
     class Meta:
         model = DataOwner
+
 
 class LogicalGroupDetailSerializer(BaseSerializer):
     id = serializers.Field('id')

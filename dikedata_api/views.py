@@ -33,7 +33,7 @@ from tls import TLSRequestMiddleware
 from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.auth import PERMISSION_CHANGE
-from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, Source,
+from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge, Source,
                               Timeseries)
 from dikedata_api import mixins, serializers
 from dikedata_api.parsers import CSVParser
@@ -530,6 +530,34 @@ class LogicalGroupDetail(APIDetailView):
     model = LogicalGroup
     serializer_class = serializers.LogicalGroupDetailSerializer
 
+    def post_save(self, obj, created=True):
+        """
+            custom function for saving many2manuy relation to self
+            This save method is not transaction save and without validation on m2m parent relation.
+            Django Restframework acts strange with 2 coonections to same model, so model instance is crated directly.
+        """
+        cur_parent_links = dict([(item.parent.id, item) for item in obj.parents.all()])
+
+        req_parent_links = self.request.DATA.getlist('parents')
+
+        for item in req_parent_links:
+            item = json.loads(item)
+            if self.request.method == 'PUT' or not 'parent' in item or item['parent'] is None:
+                #create item
+                item['child'] = obj
+                item['parent'] = LogicalGroup.objects.get(pk=item['parent'])
+                parent_link = LogicalGroupEdge(**item)
+                #todo: validation
+                #errors = parent_link.errors
+                parent_link.save()
+
+            elif item['parent'] in cur_parent_links:
+                del cur_parent_links[item['parent']]
+
+        #delete the leftovers
+        for item in cur_parent_links.values():
+            item.delete()
+
 
 class AlarmActiveList(APIListView):
     model = Alarm_Active
@@ -560,8 +588,6 @@ class AlarmSettingDetail(APIDetailView):
         cur_alarm_items = dict([(item.id, item) for item in obj.alarm_item_set.all()])
 
         req_alarm_items = self.request.DATA.getlist('alarm_item_set')
-
-        print self.request.method
 
         for item in req_alarm_items:
             item = json.loads(item)
