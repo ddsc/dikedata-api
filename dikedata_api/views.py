@@ -189,12 +189,12 @@ class DataSetDetail(APIDetailView):
 
 class DataOwnerList(APIListView):
     model = DataOwner
-    serializer_class = serializers.DataSetListSerializer
+    serializer_class = serializers.DataOwnerListSerializer
 
 
 class DataOwnerDetail(APIDetailView):
     model = DataOwner
-    serializer_class = serializers.DataSetDetailSerializer
+    serializer_class = serializers.DataOwnerDetailSerializer
 
 
 class LocationList(APIListView):
@@ -542,7 +542,7 @@ class LogicalGroupDetail(APIDetailView):
 
         for item in req_parent_links:
             item = json.loads(item)
-            if self.request.method == 'PUT' or not 'parent' in item or item['parent'] is None:
+            if self.request.method == 'POST' or not 'parent' in item or item['parent'] is None:
                 #create item
                 item['child'] = obj
                 item['parent'] = LogicalGroup.objects.get(pk=item['parent'])
@@ -591,7 +591,7 @@ class AlarmSettingDetail(APIDetailView):
 
         for item in req_alarm_items:
             item = json.loads(item)
-            if self.request.method == 'PUT' or not 'id' in item or item['id'] is None:
+            if self.request.method == 'POST' or not 'id' in item or item['id'] is None:
                 #create item
                 item['alarm_id'] = obj.id
                 alarm_item = serializers.AlarmItemDetailSerializer(None, data=item)

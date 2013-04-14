@@ -70,11 +70,13 @@ class DataSetDetailSerializer(BaseSerializer):
 class DataOwnerListSerializer(BaseSerializer):
     class Meta:
         model = DataOwner
+        fields = ('id', 'url', 'name', )
 
 
 class DataOwnerDetailSerializer(BaseSerializer):
     class Meta:
         model = DataOwner
+        fields = ('id', 'url', 'name', 'remarks', )
 
 
 class ManufacturerListSerializer(BaseSerializer):
@@ -415,8 +417,8 @@ class LogicalGroupDetailSerializer(BaseSerializer):
 class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
 
     parents = fields.ManyHyperlinkedParents(many=True,
-        view_name='logicalgroup-detail', slug_field='id')
+        view_name='logicalgroup-detail', slug_field='id', read_only=True)
 
     class Meta:
         model = LogicalGroup
-        fields = ('id', 'url', 'name', 'parents')
+        fields = ('id', 'url', 'name', 'parents', 'owner')
