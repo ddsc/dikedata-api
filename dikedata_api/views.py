@@ -35,6 +35,14 @@ from lizard_security.models import DataSet, DataOwner, UserGroup
 from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge, Source,
                               Timeseries)
+from ddsc_core.models.aquo import Compartment
+from ddsc_core.models.aquo import MeasuringDevice
+from ddsc_core.models.aquo import MeasuringMethod
+from ddsc_core.models.aquo import Parameter
+from ddsc_core.models.aquo import ProcessingMethod
+from ddsc_core.models.aquo import ReferenceFrame
+from ddsc_core.models.aquo import Unit
+
 from dikedata_api import mixins, serializers
 from dikedata_api.parsers import CSVParser
 from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
@@ -72,18 +80,20 @@ def customfilter(view, qs, filter_json):
     :param filter_json:         raw_json of filter key. example is '{"name__contains": "bla", "uuid__startswith": "7"}'
     :return:
     """
+    filter_fields = {}
+    for item in view.customfilter_fields:
+        if type(item) == tuple:
+            filter_fields[item[0]] = item[1]
+        else:
+            filter_fields[item] = item
 
     exclude = False
 
     filter_dict = json.loads(filter_json)
     for key, value in filter_dict.items():
-
-        print key
-        print value
-
         #get key and lookup
         possible_lookup = key.rsplit('__',1)
-        if possible_lookup[1] in ALL_LOOKUPS:
+        if len(possible_lookup) == 2 and possible_lookup[1] in ALL_LOOKUPS:
             key = possible_lookup[0]
             lookup = possible_lookup[1]
         else:
@@ -95,14 +105,14 @@ def customfilter(view, qs, filter_json):
             key = key.lstrip('-')
 
         #check if key is allowed
-        if not key in view.customfilter_fields:
-            raise InvalidKey(key)
-
-        if value:
+        if not key in filter_fields.keys():
+            logger.warn('Property %s is not set for filtering.'%(key))
+            #raise InvalidKey(key)
+        elif  value:
             if exclude:
-                qs = qs.exclude(**{'%s__%s' % (key, lookup): value})
+                qs = qs.exclude(**{'%s__%s' % (filter_fields[key], lookup): value})
             else:
-                qs = qs.filter(**{'%s__%s' % (key, lookup): value})
+                qs = qs.filter(**{'%s__%s' % (filter_fields[key], lookup): value})
     return qs
 
 
@@ -135,7 +145,14 @@ def write_events(user, data):
 
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
                           generics.MultipleObjectAPIView):
-    pass
+
+    def get_queryset(self):
+        kwargs = {}
+        qs = self.model.objects
+        filter = self.request.QUERY_PARAMS.get('filter', None)
+        if filter:
+            qs = customfilter(self, qs, filter)
+        return qs.filter(**kwargs).distinct()
 
 
 class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
@@ -145,6 +162,47 @@ class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
 class APIDetailView(mixins.BaseMixin, mixins.DetailModelMixin,
                     generics.SingleObjectAPIView):
     pass
+
+
+class Aquo(APIReadOnlyListView):
+    #model = Parameter
+    #serializer_class = serializers.Aqu
+    customfilter_fields = ('id', 'code', 'description', 'visible')
+
+
+class Parameter(Aquo):
+    model = Parameter
+    serializer_class = serializers.ParameterSerializer
+    customfilter_fields = ('id', 'code', 'description', 'group', 'visible')
+
+
+class Compartment(Aquo):
+    model = Compartment
+    serializer_class = serializers.CompartmentSerializer
+
+
+class MeasuringDevice(Aquo):
+    model = MeasuringDevice
+    serializer_class = serializers.MeasuringDeviceSerializer
+
+
+class MeasuringMethod(Aquo):
+    model = MeasuringMethod
+    serializer_class = serializers.MeasuringMethodSerializer
+
+
+class ProcessingMethod(Aquo):
+    model = ProcessingMethod
+    serializer_class = serializers.ProcessingMethodSerializer
+
+class ReferenceFrame(Aquo):
+    model = ReferenceFrame
+    serializer_class = serializers.ReferenceFrameSerializer
+
+
+class Unit(Aquo):
+    model = Unit
+    serializer_class = serializers.UnitSerializer
 
 
 class UserList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
@@ -234,7 +292,8 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
-    customfilter_fields = ('uuid', 'name')
+    customfilter_fields = ('uuid', 'name', 'location__name', ('parameter', 'parameter__code'),
+                           ('unit', 'unit__code'), ('dataowner', 'dataowner__name'))
 
     def get_queryset(self):
         kwargs = {}
@@ -509,6 +568,14 @@ class EventDetail(BaseEventView):
 class SourceList(APIListView):
     model = Source
     serializer_class = serializers.SourceListSerializer
+    customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name'))
+
+
+class SourceDetail(APIDetailView):
+    model = Source
+    serializer_class = serializers.SourceDetailSerializer
+    slug_field = 'uuid'
+    slug_url_kwarg = 'uuid'
 
 
 class LogicalGroupList(APIListView):
@@ -573,10 +640,10 @@ class AlarmSettingList(APIListView):
     model = Alarm
     serializer_class = serializers.AlarmSettingListSerializer
 
+    def pre_save(self, obj):
 
-class AlarmSettingDetail(APIDetailView):
-    model = Alarm
-    serializer_class = serializers.AlarmSettingDetailSerializer
+        if obj.object_id is None:
+            obj.object_id = self.request.user.id
 
     def post_save(self, obj, created=True):
         """
@@ -593,7 +660,7 @@ class AlarmSettingDetail(APIDetailView):
             item = json.loads(item)
             if self.request.method == 'POST' or not 'id' in item or item['id'] is None:
                 #create item
-                item['alarm_id'] = obj.id
+                item['alarm'] = obj.id
                 alarm_item = serializers.AlarmItemDetailSerializer(None, data=item)
                 alarm_item.is_valid()
                 alarm_item.save()
@@ -610,6 +677,47 @@ class AlarmSettingDetail(APIDetailView):
         for alarm_item in cur_alarm_items.values():
             alarm_item.delete()
 
+
+class AlarmSettingDetail(APIDetailView):
+    model = Alarm
+    serializer_class = serializers.AlarmSettingDetailSerializer
+
+    def pre_save(self, obj):
+
+        if obj.object_id is None:
+            obj.object_id = self.request.user.id
+
+    def post_save(self, obj, created=True):
+        """
+            custom function for saving nested alarm items
+            This save method is not transaction save and without validation on the alarm_items.
+            Please refactor this function when write support is added to django rest framework
+            (work in progress at this moment)
+        """
+        cur_alarm_items = dict([(item.id, item) for item in obj.alarm_item_set.all()])
+
+        req_alarm_items = self.request.DATA.getlist('alarm_item_set')
+
+        for item in req_alarm_items:
+            item = json.loads(item)
+            if self.request.method == 'POST' or not 'id' in item or item['id'] is None:
+                #create item
+                item['alarm'] = obj.id
+                alarm_item = serializers.AlarmItemDetailSerializer(None, data=item)
+                alarm_item.is_valid()
+                alarm_item.save()
+
+            elif item['id'] in cur_alarm_items:
+                #update
+                cur_item = cur_alarm_items[item['id']]
+                alarm_item = serializers.AlarmItemDetailSerializer(cur_item, data=item)
+                alarm_item.is_valid()
+                alarm_item.save()
+                del cur_alarm_items[item['id']]
+
+        #delete the leftovers
+        for alarm_item in cur_alarm_items.values():
+            alarm_item.delete()
 
 class AlarmItemDetail(APIDetailView):
     model = Alarm_Item

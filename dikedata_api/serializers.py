@@ -3,6 +3,14 @@ from __future__ import unicode_literals
 
 from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge,
                               Manufacturer, Timeseries, Source )
+from ddsc_core.models.aquo import Compartment
+from ddsc_core.models.aquo import MeasuringDevice
+from ddsc_core.models.aquo import MeasuringMethod
+from ddsc_core.models.aquo import Parameter
+from ddsc_core.models.aquo import ProcessingMethod
+from ddsc_core.models.aquo import ReferenceFrame
+from ddsc_core.models.aquo import Unit
+
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
@@ -13,6 +21,104 @@ from django.contrib.contenttypes.models import ContentType
 
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
     id = serializers.Field('id')
+
+
+class ParameterSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Parameter
+        fields = ('id', 'code', 'description', 'group', )
+
+
+class CompartmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Compartment
+        fields = ('id', 'code', 'description')
+
+
+class MeasuringDeviceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MeasuringDevice
+        fields = ('id', 'code', 'description')
+
+
+class MeasuringMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MeasuringMethod
+        fields = ('id', 'code', 'description')
+
+
+class ProcessingMethodSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProcessingMethod
+        fields = ('id', 'code', 'description')
+
+
+class ReferenceFrameSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReferenceFrame
+        fields = ('id', 'code', 'description')
+
+
+class UnitSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Unit
+        fields = ('id', 'code', 'description')
+
+
+class AquoRelatedSerializer(serializers.SlugRelatedField):
+    """
+    Base class for aquo refered fields
+    """
+    def field_to_native(self, obj, field):
+
+        item = getattr(obj, field)
+        if item:
+            return {'id': item.id, 'code': item.code, 'description': item.description }
+
+class ParameterRelSerializer(AquoRelatedSerializer):
+    """
+    """
+    class Meta:
+        model = Parameter
+        fields = ('id', 'code', 'description')
+
+
+class CompartmentRelSerializer(AquoRelatedSerializer):
+    class Meta:
+        model = Compartment
+        fields = ('id', 'code', 'description')
+
+
+class MeasuringDeviceRelSerializer(AquoRelatedSerializer):
+    class Meta:
+        model = MeasuringDevice
+        fields = ('id', 'code', 'description')
+
+
+class MeasuringMethodRelSerializer(AquoRelatedSerializer):
+    class Meta:
+        model = MeasuringMethod
+        fields = ('id', 'code', 'description')
+
+
+class ProcessingMethodRelSerializer(AquoRelatedSerializer):
+    class Meta:
+        model = ProcessingMethod
+        fields = ('id', 'code', 'description')
+
+
+class ReferenceFrameRelSerializer(AquoRelatedSerializer):
+    class Meta:
+        model = ReferenceFrame
+        fields = ('id', 'code', 'description')
+
+
+class UnitRelSerializer(AquoRelatedSerializer):
+    class Meta:
+        model = Unit
+        fields = ('id', 'code', 'description')
+
 
 
 class UserListSerializer(BaseSerializer):
@@ -79,7 +185,20 @@ class DataOwnerDetailSerializer(BaseSerializer):
         fields = ('id', 'url', 'name', 'remarks', )
 
 
+class DataOwnerRefSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = DataOwner
+
+
 class ManufacturerListSerializer(BaseSerializer):
+
+    class Meta:
+        model = Manufacturer
+        fields = ('id', 'code', 'name')
+
+
+class ManufacturerRefSerializer(serializers.SlugRelatedField):
 
     class Meta:
         model = Manufacturer
@@ -87,13 +206,33 @@ class ManufacturerListSerializer(BaseSerializer):
 
 
 class SourceListSerializer(BaseSerializer):
-    manufacturer = ManufacturerListSerializer()
+    url = serializers.HyperlinkedIdentityField(
+        view_name='source-detail', slug_field='uuid')
+    manufacturer = ManufacturerRefSerializer(slug_field='name')
+    source_type = fields.DictChoiceField(choices=Source.SOURCE_TYPES)
 
     class Meta:
         model = Source
-        fields = ('name', 'source_type', 'manufacturer')
-        depth = 1
+        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer')
 
+
+class SourceDetailSerializer(SourceListSerializer):
+
+    class Meta:
+        model = Source
+        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer')
+
+
+class SourceRefSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = Source
+        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer')
+
+    def field_to_native(self, obj, field):
+        item = getattr(obj, field)
+        if item:
+            return {'uuid': item.uuid, 'name': item.name}
 
 
 class Alarm_ActiveListSerializer(BaseSerializer):
@@ -136,6 +275,11 @@ class ModelRefSerializer(serializers.SlugRelatedField):
     class Meta:
         model = ContentType
 
+class AlarmSettingRefSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = Alarm
+
 
 class AlarmItemDetailSerializer(BaseSerializer):
 
@@ -143,10 +287,11 @@ class AlarmItemDetailSerializer(BaseSerializer):
     logical_check = fields.DictChoiceField(choices=Alarm_Item.LOGIC_TYPES)
     value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
     alarm_type = ModelRefSerializer(slug_field = 'name')
+    alarm = AlarmSettingRefSerializer(slug_field='id')
 
     class Meta:
         model = Alarm_Item
-        exclude = ('alarm', )
+        #exclude = ('alarm', )
 
 
 class AlarmSettingDetailSerializer(BaseSerializer):
@@ -244,43 +389,41 @@ class LocationDetailSerializer(SubSubLocationSerializer):
             'timeseries',
         )
 
-
-class TimeseriesListSerializer(BaseSerializer):
+class LocationRefSerializer(serializers.SlugRelatedField):
     url = serializers.HyperlinkedIdentityField(
-        view_name='timeseries-detail', slug_field='uuid')
-    events = serializers.HyperlinkedIdentityField(
-        view_name='event-list', slug_field='uuid')
-    value_type = serializers.Field('get_value_type')
-    latest_value = fields.LatestValue(view_name='event-detail')
-    parameter = fields.RelatedField(model_field='id')
-    location = fields.RelatedField(model_field='uuid')
-    logical_groups = fields.ManyRelatedField(model_field='id')
+        view_name='location-detail', slug_field='uuid')
 
     class Meta:
-        model = Timeseries
-        fields = ('id', 'url', 'uuid', 'events', 'latest_value', 'name', 'value_type',
-                  'parameter', 'location', 'logical_groups')
+        model = Location
+
+    def field_to_native(self, obj, field):
+        item = getattr(obj, field)
+        if item:
+            return {'uuid': item.uuid, 'name': item.name}
 
 
 class TimeseriesDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='timeseries-detail', slug_field='uuid')
-    location = serializers.HyperlinkedRelatedField(
-        view_name='location-detail', slug_field='uuid')
+    location = LocationRefSerializer(slug_field='uuid')
+    source = SourceRefSerializer(slug_field='uuid')
     events = serializers.HyperlinkedIdentityField(
         view_name='event-list', slug_field='uuid')
-    value_type = serializers.Field('get_value_type')
+    value_type = fields.DictChoiceField(choices=Timeseries.VALUE_TYPE)
+
     latest_value = fields.LatestValue(view_name='event-detail')
     first_value_timestamp = fields.DateTimeField()
     latest_value_timestamp = fields.DateTimeField()
-    source = SourceListSerializer()
-    parameter = fields.AquoField()
-    unit = fields.AquoField()
-    reference_frame = fields.AquoField()
-    compartment = fields.AquoField()
-    measuring_device = fields.AquoField()
-    measuring_method = fields.AquoField()
-    processing_method = fields.AquoField()
+    owner = DataOwnerRefSerializer(slug_field='name')
+
+    #source = SourceListSerializer()
+    parameter = ParameterRelSerializer(slug_field='code')
+    unit = UnitRelSerializer(slug_field='code')
+    reference_frame = ReferenceFrameRelSerializer(slug_field='code')
+    compartment = CompartmentRelSerializer(slug_field='code')
+    measuring_device = MeasuringDeviceRelSerializer(slug_field='code')
+    measuring_method = MeasuringMethodRelSerializer(slug_field='code')
+    processing_method = ProcessingMethodRelSerializer(slug_field='code')
 
     class Meta:
         model = Timeseries
@@ -305,7 +448,19 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'measuring_method',
             'processing_method',
         )
-        depth = 1
+        #depth = 1,
+        read_only = ('uuid', 'first_value_timestamp', 'latest_value_timestamp', 'latest_value', )
+
+
+class TimeseriesListSerializer(TimeseriesDetailSerializer):
+    unit = serializers.SlugRelatedField(slug_field='code')
+    parameter = serializers.SlugRelatedField(slug_field='code')
+    #location = fields.RelatedField(model_field='uuid')
+
+    class Meta:
+        model = Timeseries
+        fields = ('id', 'url', 'uuid', 'name', 'location', 'latest_value_timestamp', 'latest_value', 'events', 'value_type',
+                  'parameter', 'unit', 'owner')
 
 
 class EventListSerializer(serializers.Serializer):
@@ -371,6 +526,7 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
 
     def field_to_native(self, obj, field):
         #get display value
+
         return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
 
 
@@ -396,10 +552,6 @@ class LogicalGroupParentRefSerializer(BaseSerializer):
     #     return [{'url': t.parent, 'name': t.parent.name} for t in getattr(obj, field).all()]
 
 
-class DataOwnerRefSerializer(serializers.SlugRelatedField):
-
-    class Meta:
-        model = DataOwner
 
 
 class LogicalGroupDetailSerializer(BaseSerializer):

@@ -78,11 +78,35 @@ urlpatterns = patterns(
     url(r'^alarmitems/(?P<pk>[^/]+)/?$',
         views.AlarmItemDetail.as_view(),
         name='alarm_item-detail'),
-
-
-
-
     url(r'^sources/?$',
         views.SourceList.as_view(),
         name='source-list'),
+    url(r'^sources/(?P<uuid>[^/]+)/?$',
+        views.SourceDetail.as_view(),
+        name='source-detail'),
+
+    #aquo tables for selection
+    url(r'^parameters/?$',
+        views.Parameter.as_view(),
+        name='parameter-list'),
+    url(r'^compartments/?$',
+        views.Compartment.as_view(),
+        name='compartment-list'),
+    url(r'^measuringdevices/?$',
+        views.MeasuringDevice.as_view(),
+        name='measuring_device-list'),
+    url(r'^measuringmethods/?$',
+        views.MeasuringMethod.as_view(),
+        name='measuring_method-list'),
+    url(r'^processingmethods/?$',
+        views.ProcessingMethod.as_view(),
+        name='processing_method-list'),
+    url(r'^referenceframes/?$',
+        views.ReferenceFrame.as_view(),
+        name='reference_frame-list'),
+    url(r'^units/?$',
+        views.Unit.as_view(),
+        name='unit-list'),
+
+
 )
