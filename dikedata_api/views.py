@@ -315,6 +315,9 @@ class TimeseriesList(APIListView):
         value_type = self.request.QUERY_PARAMS.get('value_type', None)
         if value_type:
             kwargs['value_type__in'] = value_type.split(',')
+        name = self.request.QUERY_PARAMS.get('name', None)
+        if name:
+            kwargs['name__istartswith'] = name
         return qs.filter(**kwargs).distinct()
 
 
@@ -397,6 +400,7 @@ class EventList(BaseEventView):
         format = self.request.QUERY_PARAMS.get('format', None)
         eventsformat = self.request.QUERY_PARAMS.get('eventsformat', None)
         page_num = self.request.QUERY_PARAMS.get('page', 1)
+        combine_with = self.request.QUERY_PARAMS.get('combine_with', None)
 
         # parse start and end date
         if start is not None:
@@ -432,6 +436,18 @@ class EventList(BaseEventView):
             context = {'request':request}
             serializer = PaginationSerializer(instance=page, context=context)
             response = serializer.data
+        elif eventsformat == 'flot' and combine_with is not None:
+            combined_ts = Timeseries.objects.get(uuid=combine_with)
+            # returns an object ready for a jQuery scatter Flot
+            df_xaxis = ts.get_events(
+                start=start,
+                end=end,
+                filter=filter).asfreq('1H', method='pad')
+            df_yaxis = combined_ts.get_events(
+                start=start,
+                end=end,
+                filter=filter).asfreq('1H', method='pad')
+            response = self.scatter_flot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end)
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
             df = ts.get_events(start=start, end=end, filter=filter)
@@ -457,6 +473,27 @@ class EventList(BaseEventView):
                 for timestamp, row in df.iterrows()
             ]
         return events
+
+    @staticmethod
+    def scatter_flot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end):
+        data = zip(df_xaxis['value'].values, df_yaxis['value'].values)
+        line = {
+            'label': '{} vs. {}'.format(ts, combined_ts),
+            'data': data,
+            # These are added to determine the axis which will be related
+            # to the graph line.
+            'parameter_name': '{} vs. {}'.format(
+                ts.parameter,
+                combined_ts.parameter
+                ),
+            'parameter_pk': ts.parameter.pk,
+            # These are used to reset the graph boundaries when the first
+            # line is plotted.
+            'xmin': df_xaxis.min(),
+            'xmax': df_xaxis.max()
+        }
+
+        return line
 
     @staticmethod
     def format_flot(request, ts, df, start=None, end=None):
