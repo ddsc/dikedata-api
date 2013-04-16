@@ -531,6 +531,9 @@ class EventList(BaseEventView):
             elif width is not None and height is not None:
                 # Assume graph scales with min and max of the entire range here.
                 # Otherwise we need to pass axes min/max as well.
+
+                # Disable horizontal tolerance for now.
+                '''
                 try:
                     width = float(width)
                     if start and end:
@@ -545,6 +548,7 @@ class EventList(BaseEventView):
                     tolerance_w = max(tolerance_w_requested, tolerance_w_possible)
                 except ValueError:
                     tolerance_w = None
+                '''
 
                 try:
                     height = float(height)
