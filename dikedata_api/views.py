@@ -34,7 +34,7 @@ from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge, Source,
-                              Timeseries)
+                              Timeseries, Manufacturer)
 from ddsc_core.models.aquo import Compartment
 from ddsc_core.models.aquo import MeasuringDevice
 from ddsc_core.models.aquo import MeasuringMethod
@@ -203,6 +203,11 @@ class ReferenceFrame(Aquo):
 class Unit(Aquo):
     model = Unit
     serializer_class = serializers.UnitSerializer
+
+
+class ManufacturerList(APIListView):
+    model = Manufacturer
+    serializer_class = serializers.ManufacturerSerializer
 
 
 class UserList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
