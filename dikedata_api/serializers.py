@@ -120,7 +120,6 @@ class UnitRelSerializer(AquoRelatedSerializer):
         fields = ('id', 'code', 'description')
 
 
-
 class UserListSerializer(BaseSerializer):
     class Meta:
         model = User
@@ -160,19 +159,6 @@ class RoleDetailSerializer(BaseSerializer):
         exclude = ('permissions', 'permission_mappers', )
 
 
-class DataSetListSerializer(BaseSerializer):
-    class Meta:
-        model = DataSet
-
-
-class DataSetDetailSerializer(BaseSerializer):
-    timeseries = serializers.ManyHyperlinkedRelatedField(
-        view_name='timeseries-detail', slug_field='uuid')
-
-    class Meta:
-        model = DataSet
-
-
 class DataOwnerListSerializer(BaseSerializer):
     class Meta:
         model = DataOwner
@@ -191,15 +177,13 @@ class DataOwnerRefSerializer(serializers.SlugRelatedField):
         model = DataOwner
 
 
-class ManufacturerListSerializer(BaseSerializer):
-
+class ManufacturerSerializer(BaseSerializer):
     class Meta:
         model = Manufacturer
-        fields = ('id', 'code', 'name')
+        fields = ('code', 'name')
 
 
 class ManufacturerRefSerializer(serializers.SlugRelatedField):
-
     class Meta:
         model = Manufacturer
         fields = ('code', 'name')
@@ -213,14 +197,14 @@ class SourceListSerializer(BaseSerializer):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer')
+        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceDetailSerializer(SourceListSerializer):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer')
+        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceRefSerializer(serializers.SlugRelatedField):
@@ -530,8 +514,22 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
         return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
 
 
-class LogicalGroupParentRefSerializer(BaseSerializer):
+class DataSetDetailSerializer(BaseSerializer):
+    timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
+    owner = DataOwnerRefSerializer(slug_field='name')
 
+    class Meta:
+        model = DataSet
+        fields = ('id', 'url', 'name', 'owner', 'timeseries', )
+
+
+class DataSetListSerializer(DataSetDetailSerializer):
+    class Meta:
+        model = DataSet
+        fields = ('id', 'url', 'name', 'owner', )
+
+
+class LogicalGroupParentRefSerializer(BaseSerializer):
     name = serializers.SerializerMethodField('get_name')
     parent_id = serializers.SerializerMethodField('get_parent_id')
 
