@@ -438,7 +438,7 @@ class EventList(BaseEventView):
             response = serializer.data
         elif eventsformat == 'flot' and combine_with is not None:
             combined_ts = Timeseries.objects.get(uuid=combine_with)
-            # returns an object ready for a jQuery scatter Flot
+            # returns an object ready for a jQuery scatter plot
             df_xaxis = ts.get_events(
                 start=start,
                 end=end,
@@ -447,7 +447,7 @@ class EventList(BaseEventView):
                 start=start,
                 end=end,
                 filter=filter).asfreq('1H', method='pad')
-            response = self.scatter_flot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end)
+            response = self.scatter_plot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end)
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
             df = ts.get_events(start=start, end=end, filter=filter)
@@ -475,7 +475,7 @@ class EventList(BaseEventView):
         return events
 
     @staticmethod
-    def scatter_flot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end):
+    def scatter_plot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end):
         data = zip(df_xaxis['value'].values, df_yaxis['value'].values)
         line = {
             'label': '{} vs. {}'.format(ts, combined_ts),
@@ -491,8 +491,8 @@ class EventList(BaseEventView):
             'parameter_pk': ts.parameter.pk,
             # These are used to reset the graph boundaries when the first
             # line is plotted.
-            'xmin': df_xaxis.min(),
-            'xmax': df_xaxis.max()
+            'xmin': None,
+            'xmax': None
         }
 
         return line
