@@ -71,7 +71,7 @@ class InvalidKey(ParseError):
         super(ParseError, self).__init__(message)
 
 
-def customfilter(view, qs, filter_json, order_field):
+def customfilter(view, qs, filter_json, order_field=None):
     """
     Function for adding filters to queryset.
     set 'customfilter_fields for allowed fields'
