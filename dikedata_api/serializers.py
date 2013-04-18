@@ -402,6 +402,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
     class Meta:
         model = Timeseries
         fields = (
+            'id',
             'url',
             'location',
             'events',
@@ -423,7 +424,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'processing_method',
         )
         #depth = 1,
-        read_only = ('uuid', 'first_value_timestamp', 'latest_value_timestamp', 'latest_value', )
+        read_only = ('id', 'uuid', 'first_value_timestamp', 'latest_value_timestamp', 'latest_value', )
 
 
 class TimeseriesListSerializer(TimeseriesDetailSerializer):
