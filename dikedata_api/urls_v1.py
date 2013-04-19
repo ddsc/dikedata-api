@@ -84,7 +84,9 @@ urlpatterns = patterns(
     url(r'^sources/(?P<uuid>[^/]+)/?$',
         views.SourceDetail.as_view(),
         name='source-detail'),
-
+    url(r'^manufacturer/?$',
+        views.ManufacturerList.as_view(),
+        name='manufacturer-list'),
     #aquo tables for selection
     url(r'^parameters/?$',
         views.Parameter.as_view(),
