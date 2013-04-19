@@ -200,13 +200,11 @@ class SourceListSerializer(BaseSerializer):
         fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
-
 class SourceDetailSerializer(SourceListSerializer):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout',
-                    'source_group_set', 'timeseries_group_set')
+        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceRefSerializer(serializers.SlugRelatedField):
@@ -516,22 +514,22 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
         return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
 
 
-class DataSetListSerializer(BaseSerializer):
-    class Meta:
-        model = DataSet
-
-
 class DataSetDetailSerializer(BaseSerializer):
     timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
     owner = DataOwnerRefSerializer(slug_field='name')
 
     class Meta:
         model = DataSet
-        fields = ('id', 'name', 'owner', 'timeseries', )
+        fields = ('id', 'url', 'name', 'owner', 'timeseries', )
+
+
+class DataSetListSerializer(DataSetDetailSerializer):
+    class Meta:
+        model = DataSet
+        fields = ('id', 'url', 'name', 'owner', )
 
 
 class LogicalGroupParentRefSerializer(BaseSerializer):
-
     name = serializers.SerializerMethodField('get_name')
     parent_id = serializers.SerializerMethodField('get_parent_id')
 

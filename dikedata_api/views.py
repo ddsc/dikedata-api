@@ -146,6 +146,7 @@ def write_events(user, data):
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
                           generics.MultipleObjectAPIView):
 
+    customfilter_fields = []
     def get_queryset(self):
         kwargs = {}
         qs = self.model.objects
@@ -208,6 +209,7 @@ class Unit(Aquo):
 class ManufacturerList(APIListView):
     model = Manufacturer
     serializer_class = serializers.ManufacturerSerializer
+    customfilter_fields = ['code', 'name']
 
 
 class UserList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
@@ -610,7 +612,7 @@ class EventDetail(BaseEventView):
 class SourceList(APIListView):
     model = Source
     serializer_class = serializers.SourceListSerializer
-    customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name'))
+    customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout' )
 
 
 class SourceDetail(APIDetailView):
@@ -634,6 +636,37 @@ class LogicalGroupList(APIListView):
             kwargs['timeseries__parameter__in'] = parameter.split(',')
         return LogicalGroup.objects.filter(**kwargs).distinct()
 
+    def post_save(self, obj, created=True):
+        """
+            custom function for saving many2manuy relation to self
+            This save method is not transaction save and without validation on m2m parent relation.
+            Django Restframework acts strange with 2 coonections to same model, so model instance is crated directly.
+        """
+        cur_parent_links = dict([(item.parent.id, item) for item in obj.parents.all()])
+
+        req_parent_links = self.request.DATA.getlist('parents')
+
+        for item in req_parent_links:
+            item = json.loads(item)
+            print item
+
+            if item['parent'] in cur_parent_links and not self.request.method == 'POST':
+                del cur_parent_links[item['parent']]
+
+            elif 'parent' in item and item['parent'] is not None:
+                #create item
+                print 'create link'
+                item['child'] = obj
+                item['parent'] = LogicalGroup.objects.get(pk=item['parent'])
+                parent_link = LogicalGroupEdge(**item)
+                #todo: validation
+                #errors = parent_link.errors
+                parent_link.save()
+
+        #delete the leftovers
+        for item in cur_parent_links.values():
+            item.delete()
+
 
 class LogicalGroupDetail(APIDetailView):
     model = LogicalGroup
@@ -651,17 +684,20 @@ class LogicalGroupDetail(APIDetailView):
 
         for item in req_parent_links:
             item = json.loads(item)
-            if self.request.method == 'POST' or not 'parent' in item or item['parent'] is None:
+            print item
+
+            if item['parent'] in cur_parent_links and not self.request.method == 'POST':
+                del cur_parent_links[item['parent']]
+
+            elif 'parent' in item and item['parent'] is not None:
                 #create item
+                print 'create link'
                 item['child'] = obj
                 item['parent'] = LogicalGroup.objects.get(pk=item['parent'])
                 parent_link = LogicalGroupEdge(**item)
                 #todo: validation
                 #errors = parent_link.errors
                 parent_link.save()
-
-            elif item['parent'] in cur_parent_links:
-                del cur_parent_links[item['parent']]
 
         #delete the leftovers
         for item in cur_parent_links.values():
