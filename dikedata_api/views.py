@@ -489,10 +489,12 @@ class EventList(BaseEventView):
             'data': data,
             # These are added to determine the axis which will be related
             # to the graph line.
-            'parameter_name': '{} vs. {}'.format(
-                ts.parameter,
-                combined_ts.parameter
-                ),
+            'parameter_name': '{} ({}) vs. {} ({})'.format(
+                str(ts.parameter),
+                str(ts.unit),
+                str(combined_ts.parameter),
+                str(combined_ts.unit)
+            ),
             'parameter_pk': ts.parameter.pk,
             # These are used to reset the graph boundaries when the first
             # line is plotted.
@@ -510,7 +512,11 @@ class EventList(BaseEventView):
 
         if len(df) > 0:
             def to_js_timestamp(dt):
-                return float(calendar.timegm(dt.timetuple()) * 1000)
+                # Both are passed directly to Javascript's Date constructor.
+                # Older browsers only support the first, but we can drop support for them.
+                # So, just use the ISO 8601 format.
+                #return float(calendar.timegm(dt.timetuple()) * 1000)
+                return dt.strftime(COLNAME_FORMAT_MS)
             # Add values to the response.
             # Convert event dates to timestamps with milliseconds since epoch.
             # TODO see if source timezone / display timezone are relevant
@@ -532,6 +538,9 @@ class EventList(BaseEventView):
             elif width is not None and height is not None:
                 # Assume graph scales with min and max of the entire range here.
                 # Otherwise we need to pass axes min/max as well.
+
+                # Disable horizontal tolerance for now.
+                '''
                 try:
                     width = float(width)
                     if start and end:
@@ -546,6 +555,7 @@ class EventList(BaseEventView):
                     tolerance_w = max(tolerance_w_requested, tolerance_w_possible)
                 except ValueError:
                     tolerance_w = None
+                '''
 
                 try:
                     height = float(height)
@@ -577,7 +587,7 @@ class EventList(BaseEventView):
             'data': data,
             # These are added to determine the axis which will be related
             # to the graph line.
-            'parameter_name': str(ts.parameter),
+            'parameter_name': '{} ({})'.format(str(ts.parameter), str(ts.unit)),
             'parameter_pk': ts.parameter.pk,
             # These are used to reset the graph boundaries when the first
             # line is plotted.
