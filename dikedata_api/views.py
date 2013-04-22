@@ -34,7 +34,7 @@ from lizard_security.models import DataSet, DataOwner, UserGroup
 
 from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge, Source,
-                              Timeseries, Manufacturer)
+                              Timeseries, Manufacturer, StatusCache)
 from ddsc_core.models.aquo import Compartment
 from ddsc_core.models.aquo import MeasuringDevice
 from ddsc_core.models.aquo import MeasuringMethod
@@ -71,7 +71,7 @@ class InvalidKey(ParseError):
         super(ParseError, self).__init__(message)
 
 
-def customfilter(view, qs, filter_json):
+def customfilter(view, qs, filter_json, order_field):
     """
     Function for adding filters to queryset.
     set 'customfilter_fields for allowed fields'
@@ -113,6 +113,11 @@ def customfilter(view, qs, filter_json):
                 qs = qs.exclude(**{'%s__%s' % (filter_fields[key], lookup): value})
             else:
                 qs = qs.filter(**{'%s__%s' % (filter_fields[key], lookup): value})
+
+    if order_field:
+        order_field = order_field.replace('.','__')
+        qs = qs.order_by(order_field)
+
     return qs
 
 
@@ -151,8 +156,9 @@ class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
         kwargs = {}
         qs = self.model.objects
         filter = self.request.QUERY_PARAMS.get('filter', None)
+        order = self.request.QUERY_PARAMS.get('order', None)
         if filter:
-            qs = customfilter(self, qs, filter)
+            qs = customfilter(self, qs, filter, order)
         return qs.filter(**kwargs).distinct()
 
 
@@ -810,3 +816,19 @@ class AlarmSettingDetail(APIDetailView):
 class AlarmItemDetail(APIDetailView):
     model = Alarm_Item
     serializer_class = serializers.AlarmItemDetailSerializer
+
+
+class StatusCacheList(APIListView):
+    model = StatusCache
+    serializer_class = serializers.StatusCacheListSerializer
+    customfilter_fields = ('id', 'timeseries__name', 'timeseries__parameter__code',
+                           'nr_of_measurements_total', 'nr_of_measurements_reliable', 'nr_of_measurements_doubtful',
+                           'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')
+
+
+class StatusCacheDetail(APIDetailView):
+    model = StatusCache
+    serializer_class = serializers.StatusCacheDetailSerializer
+    customfilter_fields = ('id', 'timeseries__name', 'timeseries__parameter__code',
+                           'nr_of_measurements_total', 'nr_of_measurements_reliable', 'nr_of_measurements_doubtful',
+                           'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')

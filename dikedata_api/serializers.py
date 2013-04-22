@@ -2,7 +2,7 @@
 from __future__ import unicode_literals
 
 from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge,
-                              Manufacturer, Timeseries, Source )
+                              Manufacturer, Timeseries, Source, StatusCache )
 from ddsc_core.models.aquo import Compartment
 from ddsc_core.models.aquo import MeasuringDevice
 from ddsc_core.models.aquo import MeasuringMethod
@@ -219,10 +219,6 @@ class SourceRefSerializer(serializers.SlugRelatedField):
             return {'uuid': item.uuid, 'name': item.name}
 
 
-class Alarm_ActiveListSerializer(BaseSerializer):
-
-    class Meta:
-        model = Alarm_Active
 
 
 class AlarmDetailSerializer(BaseSerializer):
@@ -230,28 +226,7 @@ class AlarmDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Alarm
-        depth = 2
-
-class Alarm_ActiveDetailSerializer(BaseSerializer):
-    alarm = AlarmDetailSerializer()
-    alarm_type = serializers.SerializerMethodField('get_alarm_type')
-
-    def get_alarm_type(self, obj):
-        try:
-            alarmitems = obj.alarm.alarm_item_set.get()
-            alarm_type = alarmitems.alarm_type
-        except:
-            alarm_object = 'No Alarm type found'
-            return alarm_object
-        try:
-            alarm_object = alarm_type.get_object_for_this_type()
-        except:
-            alarm_object = 'invalid instance of {}'.format(alarm_type)
-        return alarm_object
-
-    class Meta:
-        model = Alarm_Active
-        depth = 2
+        #depth = 2
 
 
 class ModelRefSerializer(serializers.SlugRelatedField):
@@ -295,6 +270,7 @@ class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
 
     url = serializers.HyperlinkedIdentityField(
         view_name='alarm-detail')
+    single_or_group = ModelRefSerializer(slug_field='name')
 
     class Meta:
         model = Alarm
@@ -302,13 +278,27 @@ class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
             'url',
             'id',
             'name',
-            #'single_or_group',
+            'single_or_group',
             'object_id',
             'frequency',
             'urgency',
             'message_type',
             'active_status',
         )
+
+
+class Alarm_ActiveDetailSerializer(BaseSerializer):
+    alarm = AlarmSettingListSerializer()
+
+    class Meta:
+        model = Alarm_Active
+        depth = 1
+
+
+class Alarm_ActiveListSerializer(Alarm_ActiveDetailSerializer):
+
+    class Meta:
+        model = Alarm_Active
 
 
 class SubSubLocationSerializer(BaseSerializer):
@@ -572,3 +562,19 @@ class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
     class Meta:
         model = LogicalGroup
         fields = ('id', 'url', 'name', 'parents', 'owner')
+
+
+class StatusCacheDetailSerializer(BaseSerializer):
+
+    timeseries = TimeseriesListSerializer()
+    class Meta:
+        model = StatusCache
+        #exclude = ('timeseries', )
+
+
+class StatusCacheListSerializer(StatusCacheDetailSerializer):
+
+    timeseries = TimeseriesListSerializer()
+    class Meta:
+        model = StatusCache
+        #exclude = ('timeseries', )
