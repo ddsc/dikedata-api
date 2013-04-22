@@ -278,7 +278,7 @@ class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
             'url',
             'id',
             'name',
-            'single_or_group',
+            #'single_or_group',
             'object_id',
             'frequency',
             'urgency',
