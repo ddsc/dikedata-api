@@ -531,8 +531,8 @@ class EventList(BaseEventView):
                 # Both are passed directly to Javascript's Date constructor.
                 # Older browsers only support the first, but we can drop support for them.
                 # So, just use the ISO 8601 format.
-                #return float(calendar.timegm(dt.timetuple()) * 1000)
-                return dt.strftime(COLNAME_FORMAT_MS)
+                return float(calendar.timegm(dt.timetuple()) * 1000)
+                #return dt.strftime(COLNAME_FORMAT_MS)
             # Add values to the response.
             # Convert event dates to timestamps with milliseconds since epoch.
             # TODO see if source timezone / display timezone are relevant
