@@ -81,16 +81,23 @@ def customfilter(view, qs, filter_json, order_field=None):
     :return:
     """
     filter_fields = {}
-    for item in view.customfilter_fields:
-        if type(item) == tuple:
-            filter_fields[item[0]] = item[1]
-        else:
-            filter_fields[item] = item
+    if view.customfilter_fields == '*':
+        check_filter_fields = False
+    else:
+        check_filter_fields = True
+        for item in view.customfilter_fields:
+
+            if type(item) == tuple:
+                filter_fields[item[0]] = item[1]
+            else:
+                filter_fields[item] = item
 
     exclude = False
 
     filter_dict = json.loads(filter_json)
     for key, value in filter_dict.items():
+        #support for points in stead of double underscores
+        key = key.replace('.', '__')
         #get key and lookup
         possible_lookup = key.rsplit('__',1)
         if len(possible_lookup) == 2 and possible_lookup[1] in ALL_LOOKUPS:
@@ -105,14 +112,15 @@ def customfilter(view, qs, filter_json, order_field=None):
             key = key.lstrip('-')
 
         #check if key is allowed
-        if not key in filter_fields.keys():
-            logger.warn('Property %s is not set for filtering.'%(key))
-            #raise InvalidKey(key)
-        elif  value:
-            if exclude:
-                qs = qs.exclude(**{'%s__%s' % (filter_fields[key], lookup): value})
-            else:
-                qs = qs.filter(**{'%s__%s' % (filter_fields[key], lookup): value})
+        if check_filter_fields:
+            if not key in filter_fields.keys():
+                logger.warn('Property %s is not set for filtering.'%(key))
+                #raise InvalidKey(key)
+            elif  value:
+                if exclude:
+                    qs = qs.exclude(**{'%s__%s' % (filter_fields[key], lookup): value})
+                else:
+                    qs = qs.filter(**{'%s__%s' % (filter_fields[key], lookup): value})
 
     if order_field:
         order_field = order_field.replace('.','__')
@@ -151,7 +159,7 @@ def write_events(user, data):
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
                           generics.MultipleObjectAPIView):
 
-    customfilter_fields = []
+    customfilter_fields = '*'
     def get_queryset(self):
         kwargs = {}
         qs = self.model.objects
@@ -279,8 +287,9 @@ class LocationList(APIListView):
         qs = Location.objects
 
         filter = self.request.QUERY_PARAMS.get('filter', None)
+        order = self.request.QUERY_PARAMS.get('order', None)
         if filter:
-            qs = customfilter(self, qs, filter)
+            qs = customfilter(self, qs, filter, order)
 
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
@@ -313,8 +322,9 @@ class TimeseriesList(APIListView):
         qs = Timeseries.objects
 
         filter = self.request.QUERY_PARAMS.get('filter', None)
+        order = self.request.QUERY_PARAMS.get('order', None)
         if filter:
-            qs = customfilter(self, qs, filter)
+            qs = customfilter(self, qs, filter, order)
 
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
         if logicalgroup:
