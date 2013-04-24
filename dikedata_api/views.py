@@ -415,6 +415,7 @@ class EventList(BaseEventView):
 
     def get(self, request, uuid=None):
         ts = Timeseries.objects.get(uuid=uuid)
+        headers = {}
 
         # grab GET parameters
         start = self.request.QUERY_PARAMS.get('start', None)
@@ -442,6 +443,7 @@ class EventList(BaseEventView):
         if format == 'csv':
             # in case of csv return a dataframe and let the renderer handle it
             response = ts.get_events(start=start, end=end, filter=filter)
+            headers['Content-Disposition'] = 'attachment; filename=%s.csv' % uuid
         elif eventsformat is None:
             df = ts.get_events(start=start, end=end, filter=filter)
             all = self.format_default(request, ts, df)
@@ -476,7 +478,7 @@ class EventList(BaseEventView):
             df = ts.get_events(start=start, end=end, filter=filter)
             response = self.format_flot(request, ts, df, start, end)
 
-        return Response(response)
+        return Response(data=response, headers=headers)
 
     @staticmethod
     def format_default(request, ts, df):
