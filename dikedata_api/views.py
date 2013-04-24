@@ -340,7 +340,7 @@ class TimeseriesList(APIListView):
             kwargs['value_type__in'] = value_type.split(',')
         name = self.request.QUERY_PARAMS.get('name', None)
         if name:
-            kwargs['name__istartswith'] = name
+            kwargs['name__icontains'] = name
         return qs.filter(**kwargs).distinct()
 
 
