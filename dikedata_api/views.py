@@ -152,6 +152,23 @@ def write_events(user, data):
     return total, len(series), len(locations)
 
 
+def sanitize_filename(fn):
+    '''strips characters not allowed in a filename'''
+    # illegal characters in Windows and Linux filenames, such as slashes
+    filename_badchars = "<>:\"/\\|?*\0"
+    # build character translation table
+    filename_badchars_table = {ord(char): None for char in filename_badchars}
+
+    if isinstance(fn, unicode): # TODO remove for python 3
+        # strip characters like ":"
+        fn = fn.translate(filename_badchars_table)
+        # remove trailing space or period, which are not allowed in Windows
+        fn = fn.rstrip(". ")
+    else:
+        raise Exception("only unicode strings are supported")
+    return fn
+
+
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
                           generics.MultipleObjectAPIView):
 
@@ -348,7 +365,7 @@ class TimeseriesList(APIListView):
             kwargs['value_type__in'] = value_type.split(',')
         name = self.request.QUERY_PARAMS.get('name', None)
         if name:
-            kwargs['name__istartswith'] = name
+            kwargs['name__icontains'] = name
         return qs.filter(**kwargs).distinct()
 
 
@@ -425,6 +442,7 @@ class EventList(BaseEventView):
 
     def get(self, request, uuid=None):
         ts = Timeseries.objects.get(uuid=uuid)
+        headers = {}
 
         # grab GET parameters
         start = self.request.QUERY_PARAMS.get('start', None)
@@ -452,6 +470,8 @@ class EventList(BaseEventView):
         if format == 'csv':
             # in case of csv return a dataframe and let the renderer handle it
             response = ts.get_events(start=start, end=end, filter=filter)
+            headers['Content-Disposition'] = 'attachment; filename=%s-%s.csv' \
+                % (uuid, sanitize_filename(ts.name))
         elif eventsformat is None:
             df = ts.get_events(start=start, end=end, filter=filter)
             all = self.format_default(request, ts, df)
@@ -486,7 +506,7 @@ class EventList(BaseEventView):
             df = ts.get_events(start=start, end=end, filter=filter)
             response = self.format_flot(request, ts, df, start, end)
 
-        return Response(response)
+        return Response(data=response, headers=headers)
 
     @staticmethod
     def format_default(request, ts, df):
