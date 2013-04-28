@@ -129,10 +129,6 @@ def customfilter(view, qs, filter_json, order_field=None):
     return qs
 
 
-def order_by(view, qs, filter):
-    pass
-
-
 def write_events(user, data):
     if user is None:
         raise ex.NotAuthenticated("User not logged in.")
@@ -160,14 +156,19 @@ class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
                           generics.MultipleObjectAPIView):
 
     customfilter_fields = '*'
+    select_related = None
+
     def get_queryset(self):
-        kwargs = {}
         qs = self.model.objects
         filter = self.request.QUERY_PARAMS.get('filter', None)
         order = self.request.QUERY_PARAMS.get('order', None)
         if filter:
             qs = customfilter(self, qs, filter, order)
-        return qs.filter(**kwargs).distinct()
+
+        if self.select_related:
+            qs = qs.select_related(*self.select_related)
+
+        return qs.distinct()
 
 
 class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
@@ -176,7 +177,15 @@ class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
 
 class APIDetailView(mixins.BaseMixin, mixins.DetailModelMixin,
                     generics.SingleObjectAPIView):
-    pass
+
+    select_related = None
+
+    def get_queryset(self):
+        qs = self.model.objects
+
+        if self.select_related:
+            qs = qs.select_related(*self.select_related)
+        return qs
 
 
 class Aquo(APIReadOnlyListView):
@@ -259,11 +268,13 @@ class RoleDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
 class DataSetList(APIListView):
     model = DataSet
     serializer_class = serializers.DataSetListSerializer
+    select_related = ['owner']
 
 
 class DataSetDetail(APIDetailView):
     model = DataSet
     serializer_class = serializers.DataSetDetailSerializer
+    select_related = ['owner']
 
 
 class DataOwnerList(APIListView):
@@ -280,7 +291,7 @@ class LocationList(APIListView):
     model = Location
     serializer_class = serializers.SubSubLocationSerializer
 
-    customfilter_fields = ('uuid', 'name')
+    customfilter_fields = ('uuid', 'name', )
 
     def get_queryset(self):
         kwargs = {}
@@ -315,17 +326,14 @@ class TimeseriesList(APIListView):
     serializer_class = serializers.TimeseriesListSerializer
 
     customfilter_fields = ('uuid', 'name', 'location__name', ('parameter', 'parameter__code'),
-                           ('unit', 'unit__code'), ('dataowner', 'dataowner__name'))
+                           ('unit', 'unit__code'), ('owner', 'owner__name'), 'source')
+    select_related = ['location', 'parameter', 'unit', 'owner', 'source']
+
 
     def get_queryset(self):
+        qs = super(TimeseriesList, self).get_queryset()
+
         kwargs = {}
-        qs = Timeseries.objects
-
-        filter = self.request.QUERY_PARAMS.get('filter', None)
-        order = self.request.QUERY_PARAMS.get('order', None)
-        if filter:
-            qs = customfilter(self, qs, filter, order)
-
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
         if logicalgroup:
             kwargs['logical_groups__in'] = logicalgroup.split(',')
@@ -349,6 +357,8 @@ class TimeseriesDetail(APIDetailView):
     serializer_class = serializers.TimeseriesDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
+    select_related = ['location', 'parameter', 'unit', 'source', 'owner', 'processing_method', 'measuring_method',
+                      'measuring_device', 'compartment', 'reference_frame']
 
 
 class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
@@ -639,6 +649,7 @@ class SourceList(APIListView):
     model = Source
     serializer_class = serializers.SourceListSerializer
     customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout' )
+    select_related = ['manufacturer']
 
 
 class SourceDetail(APIDetailView):
@@ -646,13 +657,16 @@ class SourceDetail(APIDetailView):
     serializer_class = serializers.SourceDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
+    select_related = ['manufacturer']
 
 
 class LogicalGroupList(APIListView):
     model = LogicalGroup
     serializer_class = serializers.LogicalGroupListSerializer
+    select_related = ['owner', 'parents']
 
     def get_queryset(self):
+        qs = super(LogicalGroupList, self).get_queryset()
         kwargs = {}
         location = self.request.QUERY_PARAMS.get('location', None)
         if location:
@@ -660,7 +674,7 @@ class LogicalGroupList(APIListView):
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
             kwargs['timeseries__parameter__in'] = parameter.split(',')
-        return LogicalGroup.objects.filter(**kwargs).distinct()
+        return qs.filter(**kwargs).distinct()
 
     def post_save(self, obj, created=True):
         """
@@ -697,6 +711,7 @@ class LogicalGroupList(APIListView):
 class LogicalGroupDetail(APIDetailView):
     model = LogicalGroup
     serializer_class = serializers.LogicalGroupDetailSerializer
+    select_related = ['owner', 'parents']
 
     def post_save(self, obj, created=True):
         """
@@ -733,11 +748,13 @@ class LogicalGroupDetail(APIDetailView):
 class AlarmActiveList(APIListView):
     model = Alarm_Active
     serializer_class = serializers.Alarm_ActiveListSerializer
+    select_related = ['alarm']
 
 
 class AlarmActiveDetail(APIDetailView):
     model = Alarm_Active
     serializer_class = serializers.Alarm_ActiveDetailSerializer
+    select_related = ['alarm']
 
 
 class AlarmSettingList(APIListView):
@@ -785,6 +802,7 @@ class AlarmSettingList(APIListView):
 class AlarmSettingDetail(APIDetailView):
     model = Alarm
     serializer_class = serializers.AlarmSettingDetailSerializer
+    select_related = ['alarm_item_set', 'alarm_item_set__alarm_type'] #todo: this doesn't work, find other way
 
     def pre_save(self, obj):
 
@@ -834,6 +852,7 @@ class StatusCacheList(APIListView):
     customfilter_fields = ('id', 'timeseries__name', 'timeseries__parameter__code',
                            'nr_of_measurements_total', 'nr_of_measurements_reliable', 'nr_of_measurements_doubtful',
                            'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')
+    select_related = ['timeseries']
 
 
 class StatusCacheDetail(APIDetailView):
@@ -842,3 +861,4 @@ class StatusCacheDetail(APIDetailView):
     customfilter_fields = ('id', 'timeseries__name', 'timeseries__parameter__code',
                            'nr_of_measurements_total', 'nr_of_measurements_reliable', 'nr_of_measurements_doubtful',
                            'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')
+    select_related = ['timeseries']

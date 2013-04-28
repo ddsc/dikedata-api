@@ -15,6 +15,7 @@ from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
+from rest_framework import fields as rest_fields
 from lizard_security.models import DataOwner, DataSet, UserGroup
 from django.contrib.contenttypes.models import ContentType
 
@@ -74,7 +75,7 @@ class AquoRelatedSerializer(serializers.SlugRelatedField):
 
         item = getattr(obj, field)
         if item:
-            return {'id': item.id, 'code': item.code, 'description': item.description }
+            return {'id': item.id, 'code': item.code, 'description': item.description}
 
 class ParameterRelSerializer(AquoRelatedSerializer):
     """
@@ -197,14 +198,14 @@ class SourceListSerializer(BaseSerializer):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = ('id', 'uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceDetailSerializer(SourceListSerializer):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = ('id', 'uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceRefSerializer(serializers.SlugRelatedField):
@@ -250,7 +251,7 @@ class AlarmItemDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Alarm_Item
-        #exclude = ('alarm', )
+        exclude = ('alarm', )
 
 
 class AlarmSettingDetailSerializer(BaseSerializer):
@@ -401,6 +402,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Timeseries
+        depth = 2
         fields = (
             'id',
             'url',
@@ -422,6 +424,12 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'measuring_device',
             'measuring_method',
             'processing_method',
+            'validate_max_hard',
+            'validate_min_hard',
+            'validate_max_soft',
+            'validate_min_soft',
+            'validate_diff_hard',
+            'validate_diff_soft'
         )
         #depth = 1,
         read_only = ('id', 'uuid', 'first_value_timestamp', 'latest_value_timestamp', 'latest_value', )
@@ -435,7 +443,20 @@ class TimeseriesListSerializer(TimeseriesDetailSerializer):
     class Meta:
         model = Timeseries
         fields = ('id', 'url', 'uuid', 'name', 'location', 'latest_value_timestamp', 'latest_value', 'events', 'value_type',
-                  'parameter', 'unit', 'owner')
+                  'parameter', 'unit', 'owner', 'source')
+        depth = 2
+
+
+class TimeseriesSmallListSerializer(TimeseriesDetailSerializer):
+    unit = serializers.SlugRelatedField(slug_field='code')
+    parameter = serializers.SlugRelatedField(slug_field='code')
+    #location = fields.RelatedField(model_field='uuid')
+
+
+    class Meta:
+        model = Timeseries
+        fields = ('id', 'url', 'uuid', 'name', 'latest_value', 'value_type',)
+        #depth = 2
 
 
 class EventListSerializer(serializers.Serializer):
@@ -567,7 +588,7 @@ class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
 
 class StatusCacheDetailSerializer(BaseSerializer):
 
-    timeseries = TimeseriesListSerializer()
+    timeseries = TimeseriesSmallListSerializer()
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )
@@ -575,7 +596,7 @@ class StatusCacheDetailSerializer(BaseSerializer):
 
 class StatusCacheListSerializer(StatusCacheDetailSerializer):
 
-    timeseries = TimeseriesListSerializer()
+    timeseries = TimeseriesSmallListSerializer()
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )
