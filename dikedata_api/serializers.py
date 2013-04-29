@@ -16,7 +16,7 @@ from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 from rest_framework import fields as rest_fields
-from lizard_security.models import DataOwner, DataSet, UserGroup
+from lizard_security.models import DataOwner, DataSet, UserGroup, PermissionMapper
 from django.contrib.contenttypes.models import ContentType
 
 
@@ -309,7 +309,8 @@ class SubSubLocationSerializer(BaseSerializer):
 
     class Meta:
         model = Location
-        fields = ('url',
+        fields = ('id',
+                  'url',
                   'uuid',
                   'name',
                   'description',
@@ -323,13 +324,12 @@ class SubLocationSerializer(SubSubLocationSerializer):
 
     class Meta:
         model = Location
-        fields = (
-            'url',
-            'uuid',
-            'name',
-            'point_geometry',
-            'sublocations',
-        )
+        fields = ('id',
+                  'url',
+                  'uuid',
+                  'name',
+                  'point_geometry',
+                  'sublocations',)
 
 
 class LocationListSerializer(SubLocationSerializer):
@@ -348,6 +348,7 @@ class LocationDetailSerializer(SubSubLocationSerializer):
     class Meta:
         model = Location
         fields = (
+            'id',
             'url',
             'uuid',
             'name',
@@ -526,13 +527,35 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
         return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
 
 
+class RoleSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = Role
+
+class UserGroupSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = UserGroup
+
+
+
+class PermissionMapperSerializer(serializers.ModelSerializer):
+    permission_group = RoleSerializer(slug_field='name')
+    user_group = UserGroupSerializer(slug_field='name')
+
+    class Meta:
+        model = PermissionMapper
+        exclude = ['data_set']
+
+
 class DataSetDetailSerializer(BaseSerializer):
     timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
     owner = DataOwnerRefSerializer(slug_field='name')
+    permission_mappers = PermissionMapperSerializer(read_only=True)
 
     class Meta:
         model = DataSet
-        fields = ('id', 'url', 'name', 'owner', 'timeseries', )
+        fields = ('id', 'url', 'name', 'owner', 'timeseries', 'permission_mappers')
 
 
 class DataSetListSerializer(DataSetDetailSerializer):
