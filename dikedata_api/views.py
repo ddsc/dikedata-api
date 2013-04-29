@@ -480,17 +480,18 @@ class EventList(BaseEventView):
             serializer = PaginationSerializer(instance=page, context=context)
             response = serializer.data
         elif eventsformat == 'flot' and combine_with is not None:
-            combined_ts = Timeseries.objects.get(uuid=combine_with)
+            # scatterplot, pad to hourly frequency
+            other_ts = Timeseries.objects.get(uuid=combine_with)
             # returns an object ready for a jQuery scatter plot
             df_xaxis = ts.get_events(
                 start=start,
                 end=end,
                 filter=filter).asfreq('1H', method='pad')
-            df_yaxis = combined_ts.get_events(
+            df_yaxis = other_ts.get_events(
                 start=start,
                 end=end,
                 filter=filter).asfreq('1H', method='pad')
-            response = self.scatter_plot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end)
+            response = self.format_flot_scatter(request, df_xaxis, df_yaxis, ts, other_ts, start, end)
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
             df = ts.get_events(start=start, end=end, filter=filter)
@@ -518,10 +519,13 @@ class EventList(BaseEventView):
         return events
 
     @staticmethod
-    def scatter_plot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end):
-        data = zip(df_xaxis['value'].values, df_yaxis['value'].values)
+    def format_flot_scatter(request, df_xaxis, df_yaxis, ts, other_ts, start, end):
+        if len(df_xaxis) > 0 and len(df_yaxis) > 0:
+            data = zip(df_xaxis['value'].values, df_yaxis['value'].values)
+        else:
+            data = []
         line = {
-            'label': '{} vs. {}'.format(ts, combined_ts),
+            'label': '{} vs. {}'.format(ts, other_ts),
             'data': data,
             # These are added to determine the axis which will be related
             # to the graph line.
@@ -531,11 +535,10 @@ class EventList(BaseEventView):
                 str(ts.unit)
             ),
             'axis_label_y': '{}, {} ({})'.format(
-                str(combined_ts),
-                str(combined_ts.parameter),
-                str(combined_ts.unit)
+                str(other_ts),
+                str(other_ts.parameter),
+                str(other_ts.unit)
             ),
-            'parameter_pk': ts.parameter.pk,
             # These are used to reset the graph boundaries when the first
             # line is plotted.
             'xmin': None,
