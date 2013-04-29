@@ -525,9 +525,13 @@ class EventList(BaseEventView):
             'data': data,
             # These are added to determine the axis which will be related
             # to the graph line.
-            'parameter_name': '{} ({}) vs. {} ({})'.format(
+            'axis_label_x': '{}, {} ({})'.format(
+                str(ts),
                 str(ts.parameter),
-                str(ts.unit),
+                str(ts.unit)
+            ),
+            'axis_label_y': '{}, {} ({})'.format(
+                str(combined_ts),
                 str(combined_ts.parameter),
                 str(combined_ts.unit)
             ),
@@ -623,7 +627,7 @@ class EventList(BaseEventView):
             'data': data,
             # These are added to determine the axis which will be related
             # to the graph line.
-            'parameter_name': '{} ({})'.format(str(ts.parameter), str(ts.unit)),
+            'axis_label': '{} ({})'.format(str(ts.parameter), str(ts.unit)),
             'parameter_pk': ts.parameter.pk,
             # These are used to reset the graph boundaries when the first
             # line is plotted.
