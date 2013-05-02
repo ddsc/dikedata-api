@@ -383,7 +383,7 @@ class TimeseriesList(APIListView):
         name = self.request.QUERY_PARAMS.get('name', None)
         if name:
             kwargs['name__icontains'] = name
-        return qs.filter(**kwargs).distinct()
+        return qs.filter(**kwargs).distinct().order_by('name')
 
 
 class TimeseriesDetail(APIDetailView):
