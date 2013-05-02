@@ -136,19 +136,21 @@ def write_events(user, data):
     if user is None:
         raise ex.NotAuthenticated("User not logged in.")
     reader = ListReader(data)
-    series = {}
     permission = True
     locations = {}
+    series = {}
+    events = []
     total = 0
     for (uuid, df) in reader.get_series():
         ts = Timeseries.objects.get(uuid=uuid)
         locations[ts.location_id] = 1
-        series[uuid] = (ts, df)
+        series[uuid] = 1
+        events.append((ts, df))
         if not user.has_perm(PERMISSION_CHANGE, ts):
             permission = False
     if not permission:
         raise ex.PermissionDenied("Permission denied")
-    for uuid, (ts, df) in series.items():
+    for (ts, df) in events:
         ts.set_events(df)
         total += len(df)
         ts.save()
