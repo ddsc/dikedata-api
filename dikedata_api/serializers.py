@@ -302,48 +302,39 @@ class Alarm_ActiveListSerializer(Alarm_ActiveDetailSerializer):
         model = Alarm_Active
 
 
-class SubSubLocationSerializer(BaseSerializer):
+
+#
+# class SubLocationSerializer(SubSubLocationSerializer):
+#     sublocations = SubSubLocationSerializer(source='sublocations')
+#
+#     class Meta:
+#         model = Location
+#         fields = ('id',
+#                   'url',
+#                   'uuid',
+#                   'name',
+#                   'point_geometry',
+#                   'sublocations',)
+
+
+# class LocationListSerializer(SubLocationSerializer):
+#     sublocations = SubLocationSerializer(source='sublocations')
+
+
+class LocationDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
-    point_geometry = serializers.Field()
-
-    class Meta:
-        model = Location
-        fields = ('id',
-                  'url',
-                  'uuid',
-                  'name',
-                  'description',
-                  'point_geometry',
-                  'path',
-                  'depth',)
-
-
-class SubLocationSerializer(SubSubLocationSerializer):
-    sublocations = SubSubLocationSerializer(source='sublocations')
-
-    class Meta:
-        model = Location
-        fields = ('id',
-                  'url',
-                  'uuid',
-                  'name',
-                  'point_geometry',
-                  'sublocations',)
-
-
-class LocationListSerializer(SubLocationSerializer):
-    sublocations = SubLocationSerializer(source='sublocations')
-
-
-class LocationDetailSerializer(SubSubLocationSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
     superlocation = fields.HyperlinkedRelatedMethod(
         view_name='location-detail', slug_field='uuid', read_only=True)
     sublocations = fields.ManyHyperlinkedRelatedMethod(
         view_name='location-detail', slug_field='uuid', read_only=True)
-    point_geometry = serializers.Field()
+    point_geometry = fields.GeometryPointField()
+    srid = serializers.Field(source='get_srid')
+
+    def save_object(self, obj, **kwargs):
+        obj.save_under(parent_pk=None)
 
     class Meta:
         model = Location
@@ -355,6 +346,7 @@ class LocationDetailSerializer(SubSubLocationSerializer):
             'description',
             'point_geometry',
             'geometry_precision',
+            'srid',
             'relative_location',
             #'real_geometry',
             'created',
@@ -364,6 +356,32 @@ class LocationDetailSerializer(SubSubLocationSerializer):
             'sublocations',
             'timeseries',
         )
+        read_only_fields = (
+            'path',
+            'created',
+            'depth',
+        )
+
+
+class LocationListSerializer(LocationDetailSerializer):
+
+    class Meta:
+        model = Location
+        fields = ('id',
+                  'url',
+                  'uuid',
+                  'name',
+                  'description',
+                  'point_geometry',
+                  'srid',
+                  'path',
+                  'depth',)
+
+        read_only_fields = (
+            'path',
+            'depth',
+        )
+
 
 class LocationRefSerializer(serializers.SlugRelatedField):
     url = serializers.HyperlinkedIdentityField(
@@ -456,7 +474,7 @@ class TimeseriesSmallListSerializer(TimeseriesDetailSerializer):
 
     class Meta:
         model = Timeseries
-        fields = ('id', 'url', 'uuid', 'name', 'latest_value', 'value_type',)
+        fields = ('id', 'url', 'uuid', 'name', 'parameter', 'latest_value', 'value_type',)
         #depth = 2
 
 
