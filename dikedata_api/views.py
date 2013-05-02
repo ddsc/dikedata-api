@@ -74,7 +74,7 @@ class InvalidKey(ParseError):
         super(ParseError, self).__init__(message)
 
 
-def customfilter(view, qs, filter_json, order_field=None):
+def customfilter(view, qs, filter_json={}, order_field=None):
     """
     Function for adding filters to queryset.
     set 'customfilter_fields for allowed fields'
@@ -182,9 +182,9 @@ class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
 
     def get_queryset(self):
         qs = self.model.objects
-        filter = self.request.QUERY_PARAMS.get('filter', None)
+        filter = self.request.QUERY_PARAMS.get('filter', {})
         order = self.request.QUERY_PARAMS.get('order', None)
-        if filter:
+        if filter or order:
             qs = customfilter(self, qs, filter, order)
 
         if self.select_related:
