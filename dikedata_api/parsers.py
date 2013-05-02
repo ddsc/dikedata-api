@@ -21,7 +21,7 @@ class CSVParser(BaseParser):
     media_type = 'text/csv'
 
     def parse(self, stream, media_type=None, parser_context=None):
-        content = [line.strip().split(';') \
+        content = [line.strip().split(',') \
             for line in stream.read().split('\n') if line.strip()]
 
         data = [{'uuid':row[1].strip('"'),
