@@ -142,18 +142,18 @@ def write_events(user, data):
     events = []
     total = 0
     for (uuid, df) in reader.get_series():
-        ts = Timeseries.objects.get(uuid=uuid)
-        locations[ts.location_id] = 1
-        series[uuid] = 1
-        events.append((ts, df))
-        if not user.has_perm(PERMISSION_CHANGE, ts):
+        if uuid not in series:
+            series[uuid] = Timeseries.objects.get(uuid=uuid)
+            locations[series[uuid].location_id] = 1
+        events.append((uuid, df))
+        if not user.has_perm(PERMISSION_CHANGE, series[uuid]):
             permission = False
     if not permission:
         raise ex.PermissionDenied("Permission denied")
-    for (ts, df) in events:
-        ts.set_events(df)
+    for (uuid, df) in events:
+        series[uuid].set_events(df)
         total += len(df)
-        ts.save()
+        series[uuid].save()
     return total, len(series), len(locations)
 
 
