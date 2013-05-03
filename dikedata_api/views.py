@@ -338,6 +338,9 @@ class LocationList(APIListView):
         has_geometry = self.request.QUERY_PARAMS.get('has_geometry', None)
         if has_geometry == 'true':
             kwargs['point_geometry__isnull'] = False
+        for_map = self.request.QUERY_PARAMS.get('for_map', None)
+        if for_map == 'true':
+            kwargs['show_on_map'] = True
         return qs.filter(**kwargs).distinct()
 
 
