@@ -524,8 +524,10 @@ class EventList(BaseEventView):
             response = self.format_flot_scatter(request, df_xaxis, df_yaxis, ts, other_ts, start, end)
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
+            timer_start = datetime.now()
             df = ts.get_events(start=start, end=end, filter=filter)
-            response = self.format_flot(request, ts, df, start, end)
+            timer_get_events = datetime.now() - timer_start
+            response = self.format_flot(request, ts, df, start, end, timer_get_events=timer_get_events)
 
         return Response(data=response, headers=headers)
 
@@ -578,10 +580,14 @@ class EventList(BaseEventView):
         return line
 
     @staticmethod
-    def format_flot(request, ts, df, start=None, end=None):
+    def format_flot(request, ts, df, start=None, end=None, timer_get_events=None):
         tolerance = request.QUERY_PARAMS.get('tolerance', None)
         width = request.QUERY_PARAMS.get('width', None)
         height = request.QUERY_PARAMS.get('height', None)
+
+        timer_to_js_timestamps = None
+        timer_douglas_peucker = None
+        timer_zip = None
 
         if len(df) > 0:
             def to_js_timestamp(dt):
@@ -593,11 +599,13 @@ class EventList(BaseEventView):
             # Add values to the response.
             # Convert event dates to timestamps with milliseconds since epoch.
             # TODO see if source timezone / display timezone are relevant
+            timer_start = datetime.now()
             timestamps = [to_js_timestamp(dt) for dt in df.index]
 
             # Decimate only operates on Numpy arrays, so convert our timestamps
             # back to one.
             timestamps = np.array(timestamps)
+            timer_to_js_timestamps = datetime.now() - timer_start
             values = df['value'].values
 
             # Decimate values (a.k.a. line simplification), using Ramer-Douglas-Peucker.
@@ -643,10 +651,14 @@ class EventList(BaseEventView):
             # Only possible on 2 or more values.
             if tolerance is not None and len(df) > 1:
                 before = len(values)
+                timer_start = datetime.now()
                 timestamps, values = decimate_until(timestamps, values, tolerance)
+                timer_douglas_peucker = datetime.now() - timer_start
                 logger.debug('decimate: %s values left of %s, with tol = %s', len(values), before, tolerance)
 
+            timer_start = datetime.now()
             data = zip(timestamps, values)
+            timer_zip = datetime.now() - timer_start
             xmin = timestamps[-1] # timestamps is sorted
             xmax = timestamps[0]  # timestamps is sorted
         else:
@@ -666,6 +678,10 @@ class EventList(BaseEventView):
             # line is plotted.
             'xmin': xmin,
             'xmax': xmax,
+            'timer_get_events': str(timer_get_events),
+            'timer_to_js_timestamps': str(timer_to_js_timestamps),
+            'timer_douglas_peucker': str(timer_douglas_peucker),
+            'timer_zip': str(timer_zip),
         }
 
         return line
