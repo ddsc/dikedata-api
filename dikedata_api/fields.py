@@ -3,6 +3,7 @@ from __future__ import unicode_literals
 
 from rest_framework import fields, serializers
 from rest_framework.reverse import reverse
+from django.conf import settings
 from django.contrib.gis.geos import GEOSGeometry, Point
 
 COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
@@ -74,6 +75,23 @@ class LatestValue(serializers.HyperlinkedIdentityField):
                     request=self.context['request'])
             return None
         return obj.latest_value()
+
+
+class OpenDAPLink(serializers.HyperlinkedIdentityField):
+    def field_to_native(self, obj, field_name):
+        opendap_url = getattr(settings, 'OPENDAP_BASE_URL', '')
+        request = self.context.get('request', None)
+        format = request.QUERY_PARAMS.get('format', None)
+
+        format_map = {
+            'api': 'html',
+            'json': 'ascii',
+        }
+        if format in format_map:
+            opendap_format = format_map[format]
+        else:
+            opendap_format = 'html'
+        return "%s/%s.%s" % (opendap_url, obj.uuid, opendap_format)
 
 
 class DictChoiceField(serializers.ChoiceField):

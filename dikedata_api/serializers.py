@@ -403,6 +403,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
     source = SourceRefSerializer(slug_field='uuid')
     events = serializers.HyperlinkedIdentityField(
         view_name='event-list', slug_field='uuid')
+    opendap = fields.OpenDAPLink()
     value_type = fields.DictChoiceField(choices=Timeseries.VALUE_TYPE)
 
     latest_value = fields.LatestValue(view_name='event-detail')
@@ -427,6 +428,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'url',
             'location',
             'events',
+            'opendap',
             'latest_value',
             'uuid',
             'name',
