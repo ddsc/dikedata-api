@@ -494,7 +494,7 @@ class EventList(BaseEventView):
             headers['Content-Disposition'] = 'attachment; filename=%s-%s.csv' \
                 % (uuid, sanitize_filename(ts.name))
         elif eventsformat is None:
-            df = ts.get_events(start=start, end=end, filter=filter)
+            df = ts.get_events(start=start, end=end, filter=filter, ignore_rejected=ignore_rejected)
             all = self.format_default(request, ts, df)
             ps = generics.MultipleObjectAPIView(request=request)
             page_size = ps.get_paginate_by(None)
