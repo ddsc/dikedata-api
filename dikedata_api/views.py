@@ -414,6 +414,7 @@ class EventList(BaseEventView):
         eventsformat = self.request.QUERY_PARAMS.get('eventsformat', None)
         page_num = self.request.QUERY_PARAMS.get('page', 1)
         combine_with = self.request.QUERY_PARAMS.get('combine_with', None)
+        ignore_rejected = self.request.QUERY_PARAMS.get('ignore_rejected', None)
 
         # parse start and end date
         if start is not None:
@@ -428,6 +429,8 @@ class EventList(BaseEventView):
             except ValueError:
                 # use the alternative format
                 end = datetime.strptime(end, COLNAME_FORMAT_MS)
+        if ignore_rejected is not None:
+            try:
 
         if format == 'csv':
             # in case of csv return a dataframe and let the renderer handle it
@@ -463,7 +466,7 @@ class EventList(BaseEventView):
             response = self.scatter_plot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end)
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
-            df = ts.get_events(start=start, end=end, filter=filter)
+            df = ts.get_events(start=start, end=end, filter=filter, ignore_rejected=ignore_rejected)
             response = self.format_flot(request, ts, df, start, end)
 
         return Response(response)
