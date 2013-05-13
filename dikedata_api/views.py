@@ -442,7 +442,7 @@ class TimeseriesDetail(APIDetailView):
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user)),
+            qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user)) |
                            Q(owner__data_managers=self.request.user))
             print qs.count()
 
@@ -865,7 +865,7 @@ class LogicalGroupDetail(APIDetailView):
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(Q(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user)),
+            qs = qs.filter(Q(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))|
                              Q(owner__data_managers=self.request.user))
         return qs
 
