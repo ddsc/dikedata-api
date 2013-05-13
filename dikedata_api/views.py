@@ -32,7 +32,7 @@ import numpy as np
 
 from tls import TLSRequestMiddleware
 
-from lizard_security.models import DataSet, DataOwner, UserGroup
+from lizard_security.models import DataSet, DataOwner, UserGroup, PermissionMapper
 
 from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge, Source,
@@ -293,6 +293,19 @@ class DataSetList(APIListView):
     serializer_class = serializers.DataSetListSerializer
     select_related = ['owner']
 
+    def get_queryset(self):
+        qs = super(DataSetList, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        elif self.request.QUERY_PARAMS.get('management', False):
+            qs = qs.filter(owner__data_managers=self.request.user)
+        else:
+            qs = qs.filter(permission_mappers__user_group__members=self.request.user)
+        return qs
+
 
 class DataSetDetail(APIDetailView):
     model = DataSet
@@ -304,10 +317,29 @@ class DataOwnerList(APIListView):
     model = DataOwner
     serializer_class = serializers.DataOwnerListSerializer
 
+    def get_queryset(self):
+        qs = super(DataOwnerList, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.QUERY_PARAMS.get('management', False):
+            qs = qs.filter(data_managers=self.request.user)
+
+        return qs.distinct()
+
 
 class DataOwnerDetail(APIDetailView):
     model = DataOwner
     serializer_class = serializers.DataOwnerDetailSerializer
+
+
+    def get_queryset(self):
+        qs = super(DataOwnerDetail, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+
+        return qs.distinct()
 
 
 class LocationList(APIListView):
@@ -362,13 +394,18 @@ class TimeseriesList(APIListView):
     def get_queryset(self):
         qs = super(TimeseriesList, self).get_queryset()
 
-        # if self.request.user.is_superuser:
-        #     qs = qs
-        # elif self.request.QUERY_PARAMS.get('management', False):
-        #     qs = qs.filter(owner__manager=self.request.user)
-        # else:
-        #     print dir(self.request)
-        #     qs = qs.filter(data_set__in=self.request.data_sets)
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        elif self.request.QUERY_PARAMS.get('management', False):
+            qs = qs.filter(owner__data_managers=self.request.user)
+            #    Q(data_set__permission_mappers__in=
+            #         PermissionMapper.objects.filter(permission_group__permissions__codename='change_timeseries',
+            #                                         user_group__members=self.request.user)
+            #   ))
+        else:
+            qs = qs.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
 
         kwargs = {}
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
@@ -396,6 +433,21 @@ class TimeseriesDetail(APIDetailView):
     slug_url_kwarg = 'uuid'
     select_related = ['location', 'parameter', 'unit', 'source', 'owner', 'processing_method', 'measuring_method',
                       'measuring_device', 'compartment', 'reference_frame']
+
+    def get_queryset(self):
+        qs = super(TimeseriesDetail, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        else:
+            qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user)),
+                           Q(owner__data_managers=self.request.user))
+            print qs.count()
+
+        return qs
+
 
 
 class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
@@ -751,13 +803,14 @@ class LogicalGroupList(APIListView):
     def get_queryset(self):
         qs = super(LogicalGroupList, self).get_queryset()
 
-        #view rights
-        # if not self.request.user.is_superuser:
-        #     qs = qs
-        # elif self.request.user.QUERY_PARAMS.get('management', False):
-        #     qs = qs.filter(data_owner__user=self.request.user)
-        # else:
-        #     qs = qs.filter(timeseries__data_set=self.request.data_set)
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        elif self.request.QUERY_PARAMS.get('management', False):
+            qs = qs.filter(owner__data_managers=self.request.user)
+        else:
+            qs = qs.filter(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
 
         #special filters
         kwargs = {}
@@ -776,12 +829,10 @@ class LogicalGroupList(APIListView):
             Django Restframework acts strange with 2 coonections to same model, so model instance is crated directly.
         """
         cur_parent_links = dict([(item.parent.id, item) for item in obj.parents.all()])
-
         req_parent_links = self.request.DATA.getlist('parents')
 
         for item in req_parent_links:
             item = json.loads(item)
-            print item
 
             if item['parent'] in cur_parent_links and not self.request.method == 'POST':
                 del cur_parent_links[item['parent']]
@@ -806,6 +857,18 @@ class LogicalGroupDetail(APIDetailView):
     serializer_class = serializers.LogicalGroupDetailSerializer
     select_related = ['owner', 'parents']
 
+    def get_queryset(self):
+        qs = super(LogicalGroupDetail, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        else:
+            qs = qs.filter(Q(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user)),
+                             Q(owner__data_managers=self.request.user))
+        return qs
+
     def post_save(self, obj, created=True):
         """
             custom function for saving many2manuy relation to self
@@ -818,7 +881,6 @@ class LogicalGroupDetail(APIDetailView):
 
         for item in req_parent_links:
             item = json.loads(item)
-            print item
 
             if item['parent'] in cur_parent_links and not self.request.method == 'POST':
                 del cur_parent_links[item['parent']]
@@ -845,6 +907,10 @@ class AlarmActiveList(APIListView):
 
     def get_queryset(self):
         qs = super(AlarmActiveList, self).get_queryset()
+
+        if self.request.QUERY_PARAMS.get('all', False):
+            #only return active alarms
+            qs = qs.filter(active=True)
 
         if self.request.user.is_superuser:
             return qs
@@ -873,7 +939,9 @@ class AlarmSettingList(APIListView):
     def get_queryset(self):
         qs = super(AlarmSettingList, self).get_queryset()
 
-        if self.request.user.is_superuser:
+        if not self.request.user.is_authenticated():
+            return self.model.objects.none()
+        elif self.request.user.is_superuser:
             return qs
         else:
             return qs.filter(object_id=self.request.user.id).distinct()
@@ -970,7 +1038,10 @@ class AlarmSettingDetail(APIDetailView):
 
     def get_queryset(self):
         qs = super(AlarmSettingDetail, self).get_queryset()
-        if self.request.user.is_superuser:
+
+        if not self.request.user.is_authenticated():
+            return self.model.objects.none()
+        elif self.request.user.is_superuser:
             return qs
         else:
             return qs.filter(object_id=self.request.user.id).distinct()
@@ -1089,6 +1160,20 @@ class StatusCacheList(APIListView):
     select_related = ['timeseries', 'timeseries__parameter']
 
 
+
+    def get_queryset(self):
+        qs = super(StatusCacheList, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        else:
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+
+        return qs.distinct()
+
+
 class StatusCacheDetail(APIDetailView):
     model = StatusCache
     serializer_class = serializers.StatusCacheDetailSerializer
@@ -1096,3 +1181,14 @@ class StatusCacheDetail(APIDetailView):
                            'nr_of_measurements_total', 'nr_of_measurements_reliable', 'nr_of_measurements_doubtful',
                            'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')
     select_related = ['timeseries', 'timeseries__parameter']
+
+    def get_queryset(self):
+        qs = super(StatusCacheDetail, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        else:
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+        return qs

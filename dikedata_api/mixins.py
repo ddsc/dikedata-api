@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from django.contrib.auth.decorators import permission_required, login_required
+from django.contrib.auth.decorators import permission_required, login_required, user_passes_test
 from django.utils.decorators import method_decorator
 from rest_framework import generics, mixins
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
@@ -32,11 +32,11 @@ class PostListModelMixin(mixins.CreateModelMixin):
 
 
 class ProtectedListModelMixin(mixins.ListModelMixin, mixins.CreateModelMixin):
-    @method_decorator(login_required)
+    @method_decorator(user_passes_test(lambda u: u.is_superuser))
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
-    @method_decorator(login_required)
+    @method_decorator(user_passes_test(lambda u: u.is_superuser))
     def post(self, request, *args, **kwargs):
         return self.create(request, *args, **kwargs)
 
@@ -59,14 +59,14 @@ class DetailModelMixin(mixins.RetrieveModelMixin,
 class ProtectedDetailModelMixin(mixins.RetrieveModelMixin,
                                 mixins.UpdateModelMixin,
                                 mixins.DestroyModelMixin):
-    @method_decorator(login_required)
+    @method_decorator(user_passes_test(lambda u: u.is_superuser))
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-    @method_decorator(login_required)
+    @method_decorator(user_passes_test(lambda u: u.is_superuser))
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
-    @method_decorator(login_required)
+    @method_decorator(user_passes_test(lambda u: u.is_superuser))
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
