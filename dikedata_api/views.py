@@ -487,8 +487,6 @@ class EventList(BaseEventView):
             except ValueError:
                 # use the alternative format
                 end = datetime.strptime(end, COLNAME_FORMAT_MS)
-        if ignore_rejected is not None:
-            try:
 
         if format == 'csv':
             # in case of csv return a dataframe and let the renderer handle it
@@ -519,16 +517,22 @@ class EventList(BaseEventView):
             df_xaxis = ts.get_events(
                 start=start,
                 end=end,
-                filter=filter).asfreq('1H', method='pad')
+                filter=filter,
+                ignore_rejected=ignore_rejected).asfreq('1H', method='pad')
             df_yaxis = other_ts.get_events(
                 start=start,
                 end=end,
-                filter=filter).asfreq('1H', method='pad')
+                filter=filter,
+                ignore_rejected=ignore_rejected).asfreq('1H', method='pad')
             response = self.format_flot_scatter(request, df_xaxis, df_yaxis, ts, other_ts, start, end)
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
             timer_start = datetime.now()
-            df = ts.get_events(start=start, end=end, filter=filter)
+            df = ts.get_events(
+                start=start,
+                end=end,
+                filter=filter,
+                ignore_rejected=ignore_rejected)
             timer_get_events = datetime.now() - timer_start
             response = self.format_flot(request, ts, df, start, end, timer_get_events=timer_get_events)
 
