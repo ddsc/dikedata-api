@@ -15,7 +15,8 @@ from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
-from lizard_security.models import DataOwner, DataSet, UserGroup
+from rest_framework import fields as rest_fields
+from lizard_security.models import DataOwner, DataSet, UserGroup, PermissionMapper
 from django.contrib.contenttypes.models import ContentType
 
 
@@ -74,7 +75,7 @@ class AquoRelatedSerializer(serializers.SlugRelatedField):
 
         item = getattr(obj, field)
         if item:
-            return {'id': item.id, 'code': item.code, 'description': item.description }
+            return {'id': item.id, 'code': item.code, 'description': item.description}
 
 class ParameterRelSerializer(AquoRelatedSerializer):
     """
@@ -197,14 +198,14 @@ class SourceListSerializer(BaseSerializer):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = ('id', 'uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceDetailSerializer(SourceListSerializer):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = ('id', 'uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceRefSerializer(serializers.SlugRelatedField):
@@ -250,7 +251,7 @@ class AlarmItemDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Alarm_Item
-        #exclude = ('alarm', )
+        exclude = ('alarm', )
 
 
 class AlarmSettingDetailSerializer(BaseSerializer):
@@ -278,7 +279,7 @@ class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
             'url',
             'id',
             'name',
-            'single_or_group',
+            #'single_or_group',
             'object_id',
             'frequency',
             'urgency',
@@ -301,58 +302,51 @@ class Alarm_ActiveListSerializer(Alarm_ActiveDetailSerializer):
         model = Alarm_Active
 
 
-class SubSubLocationSerializer(BaseSerializer):
+
+#
+# class SubLocationSerializer(SubSubLocationSerializer):
+#     sublocations = SubSubLocationSerializer(source='sublocations')
+#
+#     class Meta:
+#         model = Location
+#         fields = ('id',
+#                   'url',
+#                   'uuid',
+#                   'name',
+#                   'point_geometry',
+#                   'sublocations',)
+
+
+# class LocationListSerializer(SubLocationSerializer):
+#     sublocations = SubLocationSerializer(source='sublocations')
+
+
+class LocationDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
-    point_geometry = serializers.Field()
-
-    class Meta:
-        model = Location
-        fields = ('url',
-                  'uuid',
-                  'name',
-                  'description',
-                  'point_geometry',
-                  'path',
-                  'depth',)
-
-
-class SubLocationSerializer(SubSubLocationSerializer):
-    sublocations = SubSubLocationSerializer(source='sublocations')
-
-    class Meta:
-        model = Location
-        fields = (
-            'url',
-            'uuid',
-            'name',
-            'point_geometry',
-            'sublocations',
-        )
-
-
-class LocationListSerializer(SubLocationSerializer):
-    sublocations = SubLocationSerializer(source='sublocations')
-
-
-class LocationDetailSerializer(SubSubLocationSerializer):
     timeseries = serializers.ManyHyperlinkedRelatedField(
         view_name='timeseries-detail', slug_field='uuid')
     superlocation = fields.HyperlinkedRelatedMethod(
         view_name='location-detail', slug_field='uuid', read_only=True)
     sublocations = fields.ManyHyperlinkedRelatedMethod(
         view_name='location-detail', slug_field='uuid', read_only=True)
-    point_geometry = serializers.Field()
+    point_geometry = fields.GeometryPointField()
+    srid = serializers.Field(source='get_srid')
+
+    def save_object(self, obj, **kwargs):
+        obj.save_under(parent_pk=None)
 
     class Meta:
         model = Location
         fields = (
+            'id',
             'url',
             'uuid',
             'name',
             'description',
             'point_geometry',
             'geometry_precision',
+            'srid',
             'relative_location',
             #'real_geometry',
             'created',
@@ -362,6 +356,32 @@ class LocationDetailSerializer(SubSubLocationSerializer):
             'sublocations',
             'timeseries',
         )
+        read_only_fields = (
+            'path',
+            'created',
+            'depth',
+        )
+
+
+class LocationListSerializer(LocationDetailSerializer):
+
+    class Meta:
+        model = Location
+        fields = ('id',
+                  'url',
+                  'uuid',
+                  'name',
+                  'description',
+                  'point_geometry',
+                  'srid',
+                  'path',
+                  'depth',)
+
+        read_only_fields = (
+            'path',
+            'depth',
+        )
+
 
 class LocationRefSerializer(serializers.SlugRelatedField):
     url = serializers.HyperlinkedIdentityField(
@@ -383,6 +403,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
     source = SourceRefSerializer(slug_field='uuid')
     events = serializers.HyperlinkedIdentityField(
         view_name='event-list', slug_field='uuid')
+    opendap = fields.OpenDAPLink()
     value_type = fields.DictChoiceField(choices=Timeseries.VALUE_TYPE)
 
     latest_value = fields.LatestValue(view_name='event-detail')
@@ -401,11 +422,13 @@ class TimeseriesDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Timeseries
+        depth = 2
         fields = (
             'id',
             'url',
             'location',
             'events',
+            'opendap',
             'latest_value',
             'uuid',
             'name',
@@ -422,6 +445,12 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'measuring_device',
             'measuring_method',
             'processing_method',
+            'validate_max_hard',
+            'validate_min_hard',
+            'validate_max_soft',
+            'validate_min_soft',
+            'validate_diff_hard',
+            'validate_diff_soft'
         )
         #depth = 1,
         read_only = ('id', 'uuid', 'first_value_timestamp', 'latest_value_timestamp', 'latest_value', )
@@ -435,7 +464,20 @@ class TimeseriesListSerializer(TimeseriesDetailSerializer):
     class Meta:
         model = Timeseries
         fields = ('id', 'url', 'uuid', 'name', 'location', 'latest_value_timestamp', 'latest_value', 'events', 'value_type',
-                  'parameter', 'unit', 'owner')
+                  'parameter', 'unit', 'owner', 'source')
+        depth = 2
+
+
+class TimeseriesSmallListSerializer(TimeseriesDetailSerializer):
+    unit = serializers.SlugRelatedField(slug_field='code')
+    parameter = serializers.SlugRelatedField(slug_field='code')
+    #location = fields.RelatedField(model_field='uuid')
+
+
+    class Meta:
+        model = Timeseries
+        fields = ('id', 'url', 'uuid', 'name', 'parameter', 'latest_value', 'value_type',)
+        #depth = 2
 
 
 class EventListSerializer(serializers.Serializer):
@@ -505,13 +547,35 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
         return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
 
 
+class RoleSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = Role
+
+class UserGroupSerializer(serializers.SlugRelatedField):
+
+    class Meta:
+        model = UserGroup
+
+
+
+class PermissionMapperSerializer(serializers.ModelSerializer):
+    permission_group = RoleSerializer(slug_field='name')
+    user_group = UserGroupSerializer(slug_field='name')
+
+    class Meta:
+        model = PermissionMapper
+        exclude = ['data_set']
+
+
 class DataSetDetailSerializer(BaseSerializer):
     timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
     owner = DataOwnerRefSerializer(slug_field='name')
+    permission_mappers = PermissionMapperSerializer(read_only=True)
 
     class Meta:
         model = DataSet
-        fields = ('id', 'url', 'name', 'owner', 'timeseries', )
+        fields = ('id', 'url', 'name', 'owner', 'timeseries', 'permission_mappers')
 
 
 class DataSetListSerializer(DataSetDetailSerializer):
@@ -567,7 +631,7 @@ class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
 
 class StatusCacheDetailSerializer(BaseSerializer):
 
-    timeseries = TimeseriesListSerializer()
+    timeseries = TimeseriesSmallListSerializer()
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )
@@ -575,7 +639,7 @@ class StatusCacheDetailSerializer(BaseSerializer):
 
 class StatusCacheListSerializer(StatusCacheDetailSerializer):
 
-    timeseries = TimeseriesListSerializer()
+    timeseries = TimeseriesSmallListSerializer()
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )

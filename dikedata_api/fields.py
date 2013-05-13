@@ -3,6 +3,8 @@ from __future__ import unicode_literals
 
 from rest_framework import fields, serializers
 from rest_framework.reverse import reverse
+from django.conf import settings
+from django.contrib.gis.geos import GEOSGeometry, Point
 
 COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
 
@@ -74,6 +76,24 @@ class LatestValue(serializers.HyperlinkedIdentityField):
             return None
         return obj.latest_value()
 
+
+class OpenDAPLink(serializers.HyperlinkedIdentityField):
+    def field_to_native(self, obj, field_name):
+        opendap_url = getattr(settings, 'OPENDAP_BASE_URL', '')
+        request = self.context.get('request', None)
+        format = request.QUERY_PARAMS.get('format', None)
+
+        format_map = {
+            'api': 'html',
+            'json': 'ascii',
+        }
+        if format in format_map:
+            opendap_format = format_map[format]
+        else:
+            opendap_format = 'html'
+        return "%s/%s.%s" % (opendap_url, obj.uuid, opendap_format)
+
+
 class DictChoiceField(serializers.ChoiceField):
     def to_native(self, value):
         #get display value
@@ -85,3 +105,24 @@ class DictChoiceField(serializers.ChoiceField):
         choices_dict = dict([(a[1],a[0]) for a in self._choices])
         print choices_dict[value]
         return choices_dict[value]
+
+
+class GeometryPointField(serializers.Field):
+
+    def field_from_native(self, data, files, field_name, into):
+        """
+        get geometry object
+        """
+        value = data.getlist(field_name, None)
+        print '------------------------------'
+        print value
+        srid = int(data.get('srid', 4258))
+        if value and len(value) > 0:
+            if len(value) < 2:
+                value = value[0].split(',')
+            values = [float(v) for v in value]
+            geo_input = Point(*values, srid=srid)
+            if srid != 4258:
+                geo_input_clone = geo_input.transform(4258, clone=True)
+            into[field_name] = geo_input
+        return geo_input

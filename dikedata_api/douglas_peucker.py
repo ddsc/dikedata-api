@@ -22,7 +22,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def decimate_until(x, y, tolerance, max_values=1000, max_steps=50, step_factor=2.0):
+def decimate_until(x, y, tolerance, max_values=1200, max_steps=35, step_factor=8.0):
     if len(x) <= max_values:
         # nothing to do
         return x, y

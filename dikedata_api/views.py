@@ -25,6 +25,8 @@ from rest_framework.reverse import reverse
 from rest_framework.views import APIView
 from rest_framework.pagination import PaginationSerializer
 from rest_framework.exceptions import ParseError
+from rest_framework import status
+from rest_framework.request import clone_request
 
 import numpy as np
 
@@ -57,6 +59,7 @@ COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
 FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%S.%fZ'
 
 mimetypes.init()
+from django.db.models import Q
 
 
 BOOL_LOOKUPS = ("isnull",)
@@ -71,7 +74,7 @@ class InvalidKey(ParseError):
         super(ParseError, self).__init__(message)
 
 
-def customfilter(view, qs, filter_json, order_field):
+def customfilter(view, qs, filter_json={}, order_field=None):
     """
     Function for adding filters to queryset.
     set 'customfilter_fields for allowed fields'
@@ -81,16 +84,23 @@ def customfilter(view, qs, filter_json, order_field):
     :return:
     """
     filter_fields = {}
-    for item in view.customfilter_fields:
-        if type(item) == tuple:
-            filter_fields[item[0]] = item[1]
-        else:
-            filter_fields[item] = item
+    if view.customfilter_fields == '*':
+        check_filter_fields = False
+    else:
+        check_filter_fields = True
+        for item in view.customfilter_fields:
+
+            if type(item) == tuple:
+                filter_fields[item[0]] = item[1]
+            else:
+                filter_fields[item] = item
 
     exclude = False
 
     filter_dict = json.loads(filter_json)
     for key, value in filter_dict.items():
+        #support for points in stead of double underscores
+        key = key.replace('.', '__')
         #get key and lookup
         possible_lookup = key.rsplit('__',1)
         if len(possible_lookup) == 2 and possible_lookup[1] in ALL_LOOKUPS:
@@ -105,14 +115,15 @@ def customfilter(view, qs, filter_json, order_field):
             key = key.lstrip('-')
 
         #check if key is allowed
-        if not key in filter_fields.keys():
-            logger.warn('Property %s is not set for filtering.'%(key))
-            #raise InvalidKey(key)
-        elif  value:
-            if exclude:
-                qs = qs.exclude(**{'%s__%s' % (filter_fields[key], lookup): value})
-            else:
-                qs = qs.filter(**{'%s__%s' % (filter_fields[key], lookup): value})
+        if check_filter_fields:
+            if not key in filter_fields.keys():
+                logger.warn('Property %s is not set for filtering.'%(key))
+                #raise InvalidKey(key)
+            elif  value:
+                if exclude:
+                    qs = qs.exclude(**{'%s__%s' % (filter_fields[key], lookup): value})
+                else:
+                    qs = qs.filter(**{'%s__%s' % (filter_fields[key], lookup): value})
 
     if order_field:
         order_field = order_field.replace('.','__')
@@ -121,45 +132,65 @@ def customfilter(view, qs, filter_json, order_field):
     return qs
 
 
-def order_by(view, qs, filter):
-    pass
-
-
 def write_events(user, data):
     if user is None:
         raise ex.NotAuthenticated("User not logged in.")
     reader = ListReader(data)
-    series = {}
     permission = True
     locations = {}
+    series = {}
+    events = []
     total = 0
     for (uuid, df) in reader.get_series():
-        ts = Timeseries.objects.get(uuid=uuid)
-        locations[ts.location_id] = 1
-        series[uuid] = (ts, df)
-        if not user.has_perm(PERMISSION_CHANGE, ts):
+        if uuid not in series:
+            series[uuid] = Timeseries.objects.get(uuid=uuid)
+            locations[series[uuid].location_id] = 1
+        events.append((uuid, df))
+        if not user.has_perm(PERMISSION_CHANGE, series[uuid]):
             permission = False
     if not permission:
         raise ex.PermissionDenied("Permission denied")
-    for uuid, (ts, df) in series.items():
-        ts.set_events(df)
+    for (uuid, df) in events:
+        series[uuid].set_events(df)
         total += len(df)
-        ts.save()
+        series[uuid].save()
     return total, len(series), len(locations)
+
+
+def sanitize_filename(fn):
+    '''strips characters not allowed in a filename'''
+    # illegal characters in Windows and Linux filenames, such as slashes
+    filename_badchars = "<>:\"/\\|?*\0"
+    # build character translation table
+    filename_badchars_table = {ord(char): None for char in filename_badchars}
+
+    if isinstance(fn, unicode): # TODO remove for python 3
+        # strip characters like ":"
+        fn = fn.translate(filename_badchars_table)
+        # remove trailing space or period, which are not allowed in Windows
+        fn = fn.rstrip(". ")
+    else:
+        raise Exception("only unicode strings are supported")
+    return fn
 
 
 class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
                           generics.MultipleObjectAPIView):
 
-    customfilter_fields = []
+    customfilter_fields = '*'
+    select_related = None
+
     def get_queryset(self):
-        kwargs = {}
         qs = self.model.objects
-        filter = self.request.QUERY_PARAMS.get('filter', None)
+        filter = self.request.QUERY_PARAMS.get('filter', {})
         order = self.request.QUERY_PARAMS.get('order', None)
-        if filter:
+        if filter or order:
             qs = customfilter(self, qs, filter, order)
-        return qs.filter(**kwargs).distinct()
+
+        if self.select_related:
+            qs = qs.select_related(*self.select_related)
+
+        return qs.distinct()
 
 
 class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
@@ -168,7 +199,15 @@ class APIListView(mixins.PostListModelMixin, APIReadOnlyListView):
 
 class APIDetailView(mixins.BaseMixin, mixins.DetailModelMixin,
                     generics.SingleObjectAPIView):
-    pass
+
+    select_related = None
+
+    def get_queryset(self):
+        qs = self.model.objects
+
+        if self.select_related:
+            qs = qs.select_related(*self.select_related)
+        return qs
 
 
 class Aquo(APIReadOnlyListView):
@@ -201,6 +240,7 @@ class MeasuringMethod(Aquo):
 class ProcessingMethod(Aquo):
     model = ProcessingMethod
     serializer_class = serializers.ProcessingMethodSerializer
+
 
 class ReferenceFrame(Aquo):
     model = ReferenceFrame
@@ -251,11 +291,13 @@ class RoleDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
 class DataSetList(APIListView):
     model = DataSet
     serializer_class = serializers.DataSetListSerializer
+    select_related = ['owner']
 
 
 class DataSetDetail(APIDetailView):
     model = DataSet
     serializer_class = serializers.DataSetDetailSerializer
+    select_related = ['owner']
 
 
 class DataOwnerList(APIListView):
@@ -270,18 +312,23 @@ class DataOwnerDetail(APIDetailView):
 
 class LocationList(APIListView):
     model = Location
-    serializer_class = serializers.SubSubLocationSerializer
+    serializer_class = serializers.LocationListSerializer
 
-    customfilter_fields = ('uuid', 'name')
+    customfilter_fields = ('uuid', 'name', )
 
     def get_queryset(self):
+        qs = super(LocationList, self).get_queryset()
+
+        # #view rights
+        # if not self.request.user.is_superuser:
+        #     qs = qs
+        # elif self.request.user.QUERY_PARAMS.get('management', False):
+        #     qs = qs
+        # else:
+        #     qs = qs.filter(timeseries__data_set=self.request.data_sets)
+
+        #special filters
         kwargs = {}
-        qs = Location.objects
-
-        filter = self.request.QUERY_PARAMS.get('filter', None)
-        if filter:
-            qs = customfilter(self, qs, filter)
-
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
             kwargs['timeseries__parameter__in'] = parameter.split(',')
@@ -291,6 +338,9 @@ class LocationList(APIListView):
         has_geometry = self.request.QUERY_PARAMS.get('has_geometry', None)
         if has_geometry == 'true':
             kwargs['point_geometry__isnull'] = False
+        for_map = self.request.QUERY_PARAMS.get('for_map', None)
+        if for_map == 'true':
+            kwargs['show_on_map'] = True
         return qs.filter(**kwargs).distinct()
 
 
@@ -306,16 +356,21 @@ class TimeseriesList(APIListView):
     serializer_class = serializers.TimeseriesListSerializer
 
     customfilter_fields = ('uuid', 'name', 'location__name', ('parameter', 'parameter__code'),
-                           ('unit', 'unit__code'), ('dataowner', 'dataowner__name'))
+                           ('unit', 'unit__code'), ('owner', 'owner__name'), 'source')
+    select_related = ['location', 'parameter', 'unit', 'owner', 'source']
 
     def get_queryset(self):
+        qs = super(TimeseriesList, self).get_queryset()
+
+        # if self.request.user.is_superuser:
+        #     qs = qs
+        # elif self.request.QUERY_PARAMS.get('management', False):
+        #     qs = qs.filter(owner__manager=self.request.user)
+        # else:
+        #     print dir(self.request)
+        #     qs = qs.filter(data_set__in=self.request.data_sets)
+
         kwargs = {}
-        qs = Timeseries.objects
-
-        filter = self.request.QUERY_PARAMS.get('filter', None)
-        if filter:
-            qs = customfilter(self, qs, filter)
-
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
         if logicalgroup:
             kwargs['logical_groups__in'] = logicalgroup.split(',')
@@ -330,7 +385,7 @@ class TimeseriesList(APIListView):
             kwargs['value_type__in'] = value_type.split(',')
         name = self.request.QUERY_PARAMS.get('name', None)
         if name:
-            kwargs['name__istartswith'] = name
+            kwargs['name__icontains'] = name
         return qs.filter(**kwargs).distinct()
 
 
@@ -339,6 +394,8 @@ class TimeseriesDetail(APIDetailView):
     serializer_class = serializers.TimeseriesDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
+    select_related = ['location', 'parameter', 'unit', 'source', 'owner', 'processing_method', 'measuring_method',
+                      'measuring_device', 'compartment', 'reference_frame']
 
 
 class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
@@ -405,6 +462,7 @@ class EventList(BaseEventView):
 
     def get(self, request, uuid=None):
         ts = Timeseries.objects.get(uuid=uuid)
+        headers = {}
 
         # grab GET parameters
         start = self.request.QUERY_PARAMS.get('start', None)
@@ -435,6 +493,8 @@ class EventList(BaseEventView):
         if format == 'csv':
             # in case of csv return a dataframe and let the renderer handle it
             response = ts.get_events(start=start, end=end, filter=filter)
+            headers['Content-Disposition'] = 'attachment; filename=%s-%s.csv' \
+                % (uuid, sanitize_filename(ts.name))
         elif eventsformat is None:
             df = ts.get_events(start=start, end=end, filter=filter)
             all = self.format_default(request, ts, df)
@@ -453,23 +513,26 @@ class EventList(BaseEventView):
             serializer = PaginationSerializer(instance=page, context=context)
             response = serializer.data
         elif eventsformat == 'flot' and combine_with is not None:
-            combined_ts = Timeseries.objects.get(uuid=combine_with)
+            # scatterplot, pad to hourly frequency
+            other_ts = Timeseries.objects.get(uuid=combine_with)
             # returns an object ready for a jQuery scatter plot
             df_xaxis = ts.get_events(
                 start=start,
                 end=end,
                 filter=filter).asfreq('1H', method='pad')
-            df_yaxis = combined_ts.get_events(
+            df_yaxis = other_ts.get_events(
                 start=start,
                 end=end,
                 filter=filter).asfreq('1H', method='pad')
-            response = self.scatter_plot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end)
+            response = self.format_flot_scatter(request, df_xaxis, df_yaxis, ts, other_ts, start, end)
         elif eventsformat == 'flot':
             # only return in jQuery Flot compatible format when requested
-            df = ts.get_events(start=start, end=end, filter=filter, ignore_rejected=ignore_rejected)
-            response = self.format_flot(request, ts, df, start, end)
+            timer_start = datetime.now()
+            df = ts.get_events(start=start, end=end, filter=filter)
+            timer_get_events = datetime.now() - timer_start
+            response = self.format_flot(request, ts, df, start, end, timer_get_events=timer_get_events)
 
-        return Response(response)
+        return Response(data=response, headers=headers)
 
     @staticmethod
     def format_default(request, ts, df):
@@ -491,20 +554,26 @@ class EventList(BaseEventView):
         return events
 
     @staticmethod
-    def scatter_plot(request, df_xaxis, df_yaxis, ts, combined_ts, start, end):
-        data = zip(df_xaxis['value'].values, df_yaxis['value'].values)
+    def format_flot_scatter(request, df_xaxis, df_yaxis, ts, other_ts, start, end):
+        if len(df_xaxis) > 0 and len(df_yaxis) > 0:
+            data = zip(df_xaxis['value'].values, df_yaxis['value'].values)
+        else:
+            data = []
         line = {
-            'label': '{} vs. {}'.format(ts, combined_ts),
+            'label': '{} vs. {}'.format(ts, other_ts),
             'data': data,
             # These are added to determine the axis which will be related
             # to the graph line.
-            'parameter_name': '{} ({}) vs. {} ({})'.format(
+            'axis_label_x': '{}, {} ({})'.format(
+                str(ts),
                 str(ts.parameter),
-                str(ts.unit),
-                str(combined_ts.parameter),
-                str(combined_ts.unit)
+                str(ts.unit)
             ),
-            'parameter_pk': ts.parameter.pk,
+            'axis_label_y': '{}, {} ({})'.format(
+                str(other_ts),
+                str(other_ts.parameter),
+                str(other_ts.unit)
+            ),
             # These are used to reset the graph boundaries when the first
             # line is plotted.
             'xmin': None,
@@ -514,26 +583,32 @@ class EventList(BaseEventView):
         return line
 
     @staticmethod
-    def format_flot(request, ts, df, start=None, end=None):
+    def format_flot(request, ts, df, start=None, end=None, timer_get_events=None):
         tolerance = request.QUERY_PARAMS.get('tolerance', None)
         width = request.QUERY_PARAMS.get('width', None)
         height = request.QUERY_PARAMS.get('height', None)
+
+        timer_to_js_timestamps = None
+        timer_douglas_peucker = None
+        timer_zip = None
 
         if len(df) > 0:
             def to_js_timestamp(dt):
                 # Both are passed directly to Javascript's Date constructor.
                 # Older browsers only support the first, but we can drop support for them.
                 # So, just use the ISO 8601 format.
-                #return float(calendar.timegm(dt.timetuple()) * 1000)
-                return dt.strftime(COLNAME_FORMAT_MS)
+                return float(calendar.timegm(dt.timetuple()) * 1000)
+                #return dt.strftime(COLNAME_FORMAT_MS)
             # Add values to the response.
             # Convert event dates to timestamps with milliseconds since epoch.
             # TODO see if source timezone / display timezone are relevant
+            timer_start = datetime.now()
             timestamps = [to_js_timestamp(dt) for dt in df.index]
 
             # Decimate only operates on Numpy arrays, so convert our timestamps
             # back to one.
             timestamps = np.array(timestamps)
+            timer_to_js_timestamps = datetime.now() - timer_start
             values = df['value'].values
 
             # Decimate values (a.k.a. line simplification), using Ramer-Douglas-Peucker.
@@ -579,10 +654,14 @@ class EventList(BaseEventView):
             # Only possible on 2 or more values.
             if tolerance is not None and len(df) > 1:
                 before = len(values)
+                timer_start = datetime.now()
                 timestamps, values = decimate_until(timestamps, values, tolerance)
+                timer_douglas_peucker = datetime.now() - timer_start
                 logger.debug('decimate: %s values left of %s, with tol = %s', len(values), before, tolerance)
 
+            timer_start = datetime.now()
             data = zip(timestamps, values)
+            timer_zip = datetime.now() - timer_start
             xmin = timestamps[-1] # timestamps is sorted
             xmax = timestamps[0]  # timestamps is sorted
         else:
@@ -596,12 +675,16 @@ class EventList(BaseEventView):
             'data': data,
             # These are added to determine the axis which will be related
             # to the graph line.
-            'parameter_name': '{} ({})'.format(str(ts.parameter), str(ts.unit)),
+            'axis_label': '{} ({})'.format(str(ts.parameter), str(ts.unit)),
             'parameter_pk': ts.parameter.pk,
             # These are used to reset the graph boundaries when the first
             # line is plotted.
             'xmin': xmin,
             'xmax': xmax,
+            'timer_get_events': str(timer_get_events),
+            'timer_to_js_timestamps': str(timer_to_js_timestamps),
+            'timer_douglas_peucker': str(timer_douglas_peucker),
+            'timer_zip': str(timer_zip),
         }
 
         return line
@@ -631,7 +714,21 @@ class EventDetail(BaseEventView):
 class SourceList(APIListView):
     model = Source
     serializer_class = serializers.SourceListSerializer
-    customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout' )
+    customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout')
+    select_related = ['manufacturer']
+
+    # def get_queryset(self):
+    #     qs = super(SourceList, self).get_queryset()
+    #
+    #     #view rights
+    #     if not self.request.user.is_superuser:
+    #         qs = qs
+    #     elif self.request.user.QUERY_PARAMS.get('management', False):
+    #         qs = qs
+    #     else:
+    #         qs = qs.filter(timeseries__datasets__usergroups__user=self.request.user)
+    #
+    #     return qs.distinct()
 
 
 class SourceDetail(APIDetailView):
@@ -639,13 +736,26 @@ class SourceDetail(APIDetailView):
     serializer_class = serializers.SourceDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
+    select_related = ['manufacturer']
 
 
 class LogicalGroupList(APIListView):
     model = LogicalGroup
     serializer_class = serializers.LogicalGroupListSerializer
+    select_related = ['owner', 'parents']
 
     def get_queryset(self):
+        qs = super(LogicalGroupList, self).get_queryset()
+
+        #view rights
+        # if not self.request.user.is_superuser:
+        #     qs = qs
+        # elif self.request.user.QUERY_PARAMS.get('management', False):
+        #     qs = qs.filter(data_owner__user=self.request.user)
+        # else:
+        #     qs = qs.filter(timeseries__data_set=self.request.data_set)
+
+        #special filters
         kwargs = {}
         location = self.request.QUERY_PARAMS.get('location', None)
         if location:
@@ -653,7 +763,7 @@ class LogicalGroupList(APIListView):
         parameter = self.request.QUERY_PARAMS.get('parameter', None)
         if parameter:
             kwargs['timeseries__parameter__in'] = parameter.split(',')
-        return LogicalGroup.objects.filter(**kwargs).distinct()
+        return qs.filter(**kwargs).distinct()
 
     def post_save(self, obj, created=True):
         """
@@ -690,6 +800,7 @@ class LogicalGroupList(APIListView):
 class LogicalGroupDetail(APIDetailView):
     model = LogicalGroup
     serializer_class = serializers.LogicalGroupDetailSerializer
+    select_related = ['owner', 'parents']
 
     def post_save(self, obj, created=True):
         """
@@ -726,29 +837,69 @@ class LogicalGroupDetail(APIDetailView):
 class AlarmActiveList(APIListView):
     model = Alarm_Active
     serializer_class = serializers.Alarm_ActiveListSerializer
+    select_related = ['alarm']
+
+    def get_queryset(self):
+        qs = super(AlarmActiveList, self).get_queryset()
+
+        if self.request.user.is_superuser:
+            return qs
+        else:
+            return qs.filter(alarm__object_id=self.request.user.id).distinct()
 
 
 class AlarmActiveDetail(APIDetailView):
     model = Alarm_Active
     serializer_class = serializers.Alarm_ActiveDetailSerializer
+    select_related = ['alarm']
+
+    def get_queryset(self):
+        qs = super(AlarmActiveDetail, self).get_queryset()
+
+        if self.request.user.is_superuser:
+            return qs
+        else:
+            return qs.filter(alarm__object_id=self.request.user.id).distinct()
 
 
 class AlarmSettingList(APIListView):
     model = Alarm
     serializer_class = serializers.AlarmSettingListSerializer
 
+    def get_queryset(self):
+        qs = super(AlarmSettingList, self).get_queryset()
+
+        if self.request.user.is_superuser:
+            return qs
+        else:
+            return qs.filter(object_id=self.request.user.id).distinct()
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.DATA, files=request.FILES)
+
+        if serializer.is_valid():
+            if self.pre_save(serializer.object):
+                self.object = serializer.save(force_insert=True)
+                self.post_save(self.object, created=True)
+                headers = self.get_success_headers(serializer.data)
+                return Response(serializer.data, status=status.HTTP_201_CREATED,
+                            headers=headers)
+            else:
+                return Response(self.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
     def pre_save(self, obj):
 
         if obj.object_id is None:
-            obj.object_id = self.request.user.id
+            obj.content_object = self.request.user
 
-    def post_save(self, obj, created=True):
-        """
-            custom function for saving nested alarm items
-            This save method is not transaction save and without validation on the alarm_items.
-            Please refactor this function when write support is added to django rest framework
-            (work in progress at this moment)
-        """
+        self.update_alarm_items = []
+        self.create_alarm_items = []
+        self.delete_alarm_items = []
+        errors = []
+        error = False
+
         cur_alarm_items = dict([(item.id, item) for item in obj.alarm_item_set.all()])
 
         req_alarm_items = self.request.DATA.getlist('alarm_item_set')
@@ -757,40 +908,110 @@ class AlarmSettingList(APIListView):
             item = json.loads(item)
             if self.request.method == 'POST' or not 'id' in item or item['id'] is None:
                 #create item
-                item['alarm'] = obj.id
+                item['alarm_id'] = obj.id
                 alarm_item = serializers.AlarmItemDetailSerializer(None, data=item)
-                alarm_item.is_valid()
-                alarm_item.save()
+
+                if alarm_item.is_valid():
+                    self.create_alarm_items.append(alarm_item)
+                else:
+                    errors.append(alarm_item.errors)
+                    error = True
 
             elif item['id'] in cur_alarm_items:
                 #update
                 cur_item = cur_alarm_items[item['id']]
                 alarm_item = serializers.AlarmItemDetailSerializer(cur_item, data=item)
-                alarm_item.is_valid()
-                alarm_item.save()
+                if alarm_item.is_valid():
+                    self.update_alarm_items.append(alarm_item)
+                else:
+                    errors.append(alarm_item.errors)
+                    error = True
+
                 del cur_alarm_items[item['id']]
 
         #delete the leftovers
         for alarm_item in cur_alarm_items.values():
-            alarm_item.delete()
+            self.delete_alarm_items.append(alarm_item)
+
+        if error:
+            self.errors = {'alarm_item_set': errors}
+            return False
+        else:
+            return True
+
+    def post_save(self, obj, created=True):
+        """
+            custom function for saving nested alarm items
+            This save method is not transaction save and without validation on the alarm_items.
+            Please refactor this function when write support is added to django rest framework
+            (work in progress at this moment)
+        """
+
+        for item in self.update_alarm_items:
+            item.save()
+
+        for item in self.create_alarm_items:
+            item.object.alarm = obj
+            item.save()
+
+        for item in self.delete_alarm_items:
+            item.delete()
+
 
 
 class AlarmSettingDetail(APIDetailView):
     model = Alarm
     serializer_class = serializers.AlarmSettingDetailSerializer
+    select_related = ['alarm_item_set', 'alarm_item_set__alarm_type'] #todo: this doesn't work, find other way
+
+    def get_queryset(self):
+        qs = super(AlarmSettingDetail, self).get_queryset()
+        if self.request.user.is_superuser:
+            return qs
+        else:
+            return qs.filter(object_id=self.request.user.id).distinct()
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        self.object = None
+        try:
+            self.object = self.get_object()
+        except Http404:
+            # If this is a PUT-as-create operation, we need to ensure that
+            # we have relevant permissions, as if this was a POST request.
+            self.check_permissions(clone_request(request, 'POST'))
+            created = True
+            save_kwargs = {'force_insert': True}
+            success_status_code = status.HTTP_201_CREATED
+        else:
+            created = False
+            save_kwargs = {'force_update': True}
+            success_status_code = status.HTTP_200_OK
+
+        serializer = self.get_serializer(self.object, data=request.DATA,
+                                         files=request.FILES, partial=partial)
+
+        if serializer.is_valid():
+            if self.pre_save(serializer.object):
+                self.object = serializer.save(**save_kwargs)
+                self.post_save(self.object, created=created)
+                return Response(serializer.data, status=success_status_code)
+            else:
+                return Response(self.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def pre_save(self, obj):
 
         if obj.object_id is None:
-            obj.object_id = self.request.user.id
+            obj.content_object = self.request.user
 
-    def post_save(self, obj, created=True):
-        """
-            custom function for saving nested alarm items
-            This save method is not transaction save and without validation on the alarm_items.
-            Please refactor this function when write support is added to django rest framework
-            (work in progress at this moment)
-        """
+        self.update_alarm_items = []
+        self.create_alarm_items = []
+        self.delete_alarm_items = []
+        errors = []
+        error = False
+
         cur_alarm_items = dict([(item.id, item) for item in obj.alarm_item_set.all()])
 
         req_alarm_items = self.request.DATA.getlist('alarm_item_set')
@@ -799,22 +1020,56 @@ class AlarmSettingDetail(APIDetailView):
             item = json.loads(item)
             if self.request.method == 'POST' or not 'id' in item or item['id'] is None:
                 #create item
-                item['alarm'] = obj.id
+                item['alarm_id'] = obj.id
                 alarm_item = serializers.AlarmItemDetailSerializer(None, data=item)
-                alarm_item.is_valid()
-                alarm_item.save()
+
+                if alarm_item.is_valid():
+                    self.create_alarm_items.append(alarm_item)
+                else:
+                    errors.append(alarm_item.errors)
+                    error = True
 
             elif item['id'] in cur_alarm_items:
                 #update
                 cur_item = cur_alarm_items[item['id']]
                 alarm_item = serializers.AlarmItemDetailSerializer(cur_item, data=item)
-                alarm_item.is_valid()
-                alarm_item.save()
+                if alarm_item.is_valid():
+                    self.update_alarm_items.append(alarm_item)
+                else:
+                    errors.append(alarm_item.errors)
+                    error = True
+
                 del cur_alarm_items[item['id']]
 
         #delete the leftovers
         for alarm_item in cur_alarm_items.values():
-            alarm_item.delete()
+            self.delete_alarm_items.append(alarm_item)
+
+
+        if error:
+            self.errors = {'alarm_item_set': errors}
+            return False
+        else:
+            return True
+
+    def post_save(self, obj, created=True):
+        """
+            custom function for saving nested alarm items
+            This save method is not transaction save and without validation on the alarm_items.
+            Please refactor this function when write support is added to django rest framework
+            (work in progress at this moment)
+        """
+
+        for item in self.update_alarm_items:
+            item.save()
+
+        for item in self.create_alarm_items:
+            item.object.alarm = obj
+            item.save()
+
+        for item in self.delete_alarm_items:
+            item.delete()
+
 
 class AlarmItemDetail(APIDetailView):
     model = Alarm_Item
@@ -824,14 +1079,16 @@ class AlarmItemDetail(APIDetailView):
 class StatusCacheList(APIListView):
     model = StatusCache
     serializer_class = serializers.StatusCacheListSerializer
-    customfilter_fields = ('id', 'timeseries__name', 'timeseries__parameter__code',
+    customfilter_fields = ('id', 'timeseries__name', ('timeseries__parameter', 'timeseries__parameter__code'),
                            'nr_of_measurements_total', 'nr_of_measurements_reliable', 'nr_of_measurements_doubtful',
                            'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')
+    select_related = ['timeseries', 'timeseries__parameter']
 
 
 class StatusCacheDetail(APIDetailView):
     model = StatusCache
     serializer_class = serializers.StatusCacheDetailSerializer
-    customfilter_fields = ('id', 'timeseries__name', 'timeseries__parameter__code',
+    customfilter_fields = ('id', 'timeseries__name', ('timeseries__parameter', 'timeseries__parameter__code'),
                            'nr_of_measurements_total', 'nr_of_measurements_reliable', 'nr_of_measurements_doubtful',
                            'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')
+    select_related = ['timeseries', 'timeseries__parameter']

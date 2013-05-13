@@ -1,7 +1,7 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from django.contrib.auth.decorators import permission_required
+from django.contrib.auth.decorators import permission_required, login_required
 from django.utils.decorators import method_decorator
 from rest_framework import generics, mixins
 from rest_framework.renderers import BrowsableAPIRenderer, JSONRenderer
@@ -26,17 +26,17 @@ class GetListModelMixin(mixins.ListModelMixin):
 
 
 class PostListModelMixin(mixins.CreateModelMixin):
-    @method_decorator(permission_required('add', raise_exception=True))
+    @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
         return self.create(request, *args, **kwargs)
 
 
 class ProtectedListModelMixin(mixins.ListModelMixin, mixins.CreateModelMixin):
-    @method_decorator(permission_required('staff', raise_exception=True))
+    @method_decorator(login_required)
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
 
-    @method_decorator(permission_required('staff', raise_exception=True))
+    @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
         return self.create(request, *args, **kwargs)
 
@@ -47,11 +47,11 @@ class DetailModelMixin(mixins.RetrieveModelMixin,
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-    @method_decorator(permission_required('change', raise_exception=True))
+    @method_decorator(login_required)
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
-    @method_decorator(permission_required('delete', raise_exception=True))
+    @method_decorator(login_required)
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
 
@@ -59,14 +59,14 @@ class DetailModelMixin(mixins.RetrieveModelMixin,
 class ProtectedDetailModelMixin(mixins.RetrieveModelMixin,
                                 mixins.UpdateModelMixin,
                                 mixins.DestroyModelMixin):
-    @method_decorator(permission_required('staff', raise_exception=True))
+    @method_decorator(login_required)
     def get(self, request, *args, **kwargs):
         return self.retrieve(request, *args, **kwargs)
 
-    @method_decorator(permission_required('staff', raise_exception=True))
+    @method_decorator(login_required)
     def put(self, request, *args, **kwargs):
         return self.update(request, *args, **kwargs)
 
-    @method_decorator(permission_required('staff', raise_exception=True))
+    @method_decorator(login_required)
     def delete(self, request, *args, **kwargs):
         return self.destroy(request, *args, **kwargs)
