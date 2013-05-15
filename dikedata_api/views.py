@@ -1203,9 +1203,14 @@ class Summary(APIReadOnlyListView):
                           ".frequency * INTERVAL '1 SECOND'"]).count()
 
         active_alarms = Alarm_Active.objects.filter(active=True).count()
-        new_events = StatusCache.objects.values('date') \
+        status = StatusCache.objects.values('date') \
             .annotate((Sum('nr_of_measurements_total'))) \
-            .order_by('-date')[:1][0]['nr_of_measurements_total__sum']
+            .order_by('-date')[:1]
+
+        if len(status) > 0 and 'nr_of_measurements_total__sum' in status[0]:
+            new_events = status[0]['nr_of_measurements_total__sum']
+        else:
+            new_events = 0
 
         data = {
             'timeseries' : {
