@@ -115,6 +115,9 @@ urlpatterns = patterns(
     url(r'^units/?$',
         views.Unit.as_view(),
         name='unit-list'),
+    url(r'^summary/?$',
+        views.Summary.as_view(),
+        name='summary'),
 
 
 )
