@@ -547,6 +547,17 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
         return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
 
 
+class RecursiveTimeseriesSerializer(serializers.HyperlinkedRelatedField):
+
+    class Meta:
+        model = Timeseries
+
+    def field_to_native(self, obj, field):
+        #get display value
+
+        return [{'url': self.to_native(t), 'name': t.name} for t in obj.timeseries_r()]
+
+
 class RoleSerializer(serializers.SlugRelatedField):
 
     class Meta:
@@ -609,7 +620,7 @@ class LogicalGroupParentRefSerializer(BaseSerializer):
 
 class LogicalGroupDetailSerializer(BaseSerializer):
     id = serializers.Field('id')
-    timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
+    timeseries = RecursiveTimeseriesSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
     parents = LogicalGroupParentRefSerializer(many=True, read_only=True)
     childs = fields.ManyHyperlinkedChilds(
         view_name='logicalgroup-detail', read_only=True)
