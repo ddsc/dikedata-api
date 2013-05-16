@@ -36,7 +36,8 @@ from tls import TLSRequestMiddleware
 from lizard_security.models import DataSet, DataOwner, UserGroup, PermissionMapper
 
 from ddsc_core.auth import PERMISSION_CHANGE
-from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge, Source,
+from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, IdMapping,
+                              Location, LogicalGroup, LogicalGroupEdge, Source,
                               Timeseries, Manufacturer, StatusCache)
 from ddsc_core.models.aquo import Compartment
 from ddsc_core.models.aquo import MeasuringDevice
@@ -144,7 +145,11 @@ def write_events(user, data):
     total = 0
     for (uuid, df) in reader.get_series():
         if uuid not in series:
-            series[uuid] = Timeseries.objects.get(uuid=uuid)
+            try:
+                series[uuid] = Timeseries.objects.get(uuid=uuid)
+            except Timeseries.DoesNotExist:
+                map = IdMapping.objects.get(user__username=user, remote_id=uuid)
+                series[uuid] = map.timeseries
             locations[series[uuid].location_id] = 1
         events.append((uuid, df))
         if not user.has_perm(PERMISSION_CHANGE, series[uuid]):
