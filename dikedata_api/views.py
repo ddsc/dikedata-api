@@ -351,13 +351,14 @@ class LocationList(APIListView):
     def get_queryset(self):
         qs = super(LocationList, self).get_queryset()
 
-        # #view rights
-        # if not self.request.user.is_superuser:
-        #     qs = qs
-        # elif self.request.user.QUERY_PARAMS.get('management', False):
-        #     qs = qs
-        # else:
-        #     qs = qs.filter(timeseries__data_set=self.request.data_sets)
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.filter(timeseries__owner=None)
+        elif self.request.user.is_superuser:
+            qs = qs
+        elif self.request.QUERY_PARAMS.get('management', False):
+            qs = qs.filter(owner__data_managers=self.request.user)
+        else:
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
 
         #special filters
         kwargs = {}
@@ -381,6 +382,19 @@ class LocationDetail(APIDetailView):
     serializer_class = serializers.LocationDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
+
+    def get_queryset(self):
+        qs = super(SourceDetail, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.filter(timeseries__owner=None)
+        elif self.request.user.is_superuser:
+            qs = qs
+        else:
+            qs = qs.filter(Q(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))|
+                            Q(owner__data_managers=self.request.user))
+        return qs.distinct()
+
 
 
 class TimeseriesList(APIListView):
@@ -444,9 +458,7 @@ class TimeseriesDetail(APIDetailView):
         else:
             qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user)) |
                            Q(owner__data_managers=self.request.user))
-            print qs.count()
-
-        return qs
+        return qs.distinct()
 
 
 
@@ -773,18 +785,19 @@ class SourceList(APIListView):
     customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout')
     select_related = ['manufacturer']
 
-    # def get_queryset(self):
-    #     qs = super(SourceList, self).get_queryset()
-    #
-    #     #view rights
-    #     if not self.request.user.is_superuser:
-    #         qs = qs
-    #     elif self.request.user.QUERY_PARAMS.get('management', False):
-    #         qs = qs
-    #     else:
-    #         qs = qs.filter(timeseries__datasets__usergroups__user=self.request.user)
-    #
-    #     return qs.distinct()
+    def get_queryset(self):
+        qs = super(SourceList, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        elif self.request.QUERY_PARAMS.get('management', False):
+            qs = qs.filter(owner__data_managers=self.request.user)
+        else:
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+
+        return qs.distinct()
 
 
 class SourceDetail(APIDetailView):
@@ -793,6 +806,19 @@ class SourceDetail(APIDetailView):
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
     select_related = ['manufacturer']
+
+    def get_queryset(self):
+        qs = super(SourceDetail, self).get_queryset()
+
+        if not self.request.user.is_authenticated():
+            qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
+        else:
+            qs = qs.filter(Q(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))|
+                            Q(owner__data_managers=self.request.user))
+
+        return qs.distinct()
 
 
 class LogicalGroupList(APIListView):
@@ -908,7 +934,7 @@ class AlarmActiveList(APIListView):
     def get_queryset(self):
         qs = super(AlarmActiveList, self).get_queryset()
 
-        if self.request.QUERY_PARAMS.get('all', False):
+        if not self.request.QUERY_PARAMS.get('all', False):
             #only return active alarms
             qs = qs.filter(active=True)
 
@@ -1159,13 +1185,11 @@ class StatusCacheList(APIListView):
                            'nr_of_measurements_unreliable', 'min_val', 'max_val', 'mean_val', 'std_val', 'status_date')
     select_related = ['timeseries', 'timeseries__parameter']
 
-
-
     def get_queryset(self):
         qs = super(StatusCacheList, self).get_queryset()
 
         if not self.request.user.is_authenticated():
-            qs = self.model.objects.none()
+            qs = self.model.filter(timeseries__owner=None)
         elif self.request.user.is_superuser:
             qs = qs
         else:
@@ -1186,7 +1210,7 @@ class StatusCacheDetail(APIDetailView):
         qs = super(StatusCacheDetail, self).get_queryset()
 
         if not self.request.user.is_authenticated():
-            qs = self.model.objects.none()
+            qs = self.model.filter(timeseries__owner=None)
         elif self.request.user.is_superuser:
             qs = qs
         else:

@@ -198,21 +198,21 @@ class SourceListSerializer(BaseSerializer):
 
     class Meta:
         model = Source
-        fields = ('id', 'uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = ('id', 'uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceDetailSerializer(SourceListSerializer):
 
     class Meta:
         model = Source
-        fields = ('id', 'uuid', 'url', 'name', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = ('id', 'uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
 
 
 class SourceRefSerializer(serializers.SlugRelatedField):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'source_type', 'manufacturer')
+        fields = ('uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer')
 
     def field_to_native(self, obj, field):
         item = getattr(obj, field)
@@ -349,6 +349,8 @@ class LocationDetailSerializer(BaseSerializer):
             'srid',
             'relative_location',
             #'real_geometry',
+            'owner',
+            'show_on_map',
             'created',
             'path',
             'depth',
@@ -371,11 +373,10 @@ class LocationListSerializer(LocationDetailSerializer):
                   'url',
                   'uuid',
                   'name',
-                  'description',
+                  'owner',
+                  'show_on_map',
                   'point_geometry',
-                  'srid',
-                  'path',
-                  'depth',)
+                  'srid')
 
         read_only_fields = (
             'path',
