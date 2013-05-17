@@ -1219,6 +1219,7 @@ class Summary(APIReadOnlyListView):
 
             if not request.user.is_superuser:
                 ts_manager = ts_manager.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=request.user))
+                aa_manager = aa_manager.filter(alarm__object_id=request.user.id)
                 sc_manager = sc_manager.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=request.user))
 
             total = ts_manager.count()
