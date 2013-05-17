@@ -14,6 +14,7 @@ from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
+from django.db.models import F, Sum
 from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
 
@@ -35,7 +36,8 @@ from tls import TLSRequestMiddleware
 from lizard_security.models import DataSet, DataOwner, UserGroup, PermissionMapper
 
 from ddsc_core.auth import PERMISSION_CHANGE
-from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge, Source,
+from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, IdMapping,
+                              Location, LogicalGroup, LogicalGroupEdge, Source,
                               Timeseries, Manufacturer, StatusCache)
 from ddsc_core.models.aquo import Compartment
 from ddsc_core.models.aquo import MeasuringDevice
@@ -143,7 +145,11 @@ def write_events(user, data):
     total = 0
     for (uuid, df) in reader.get_series():
         if uuid not in series:
-            series[uuid] = Timeseries.objects.get(uuid=uuid)
+            try:
+                series[uuid] = Timeseries.objects.get(uuid=uuid)
+            except Timeseries.DoesNotExist:
+                map = IdMapping.objects.get(user__username=user, remote_id=uuid)
+                series[uuid] = map.timeseries
             locations[series[uuid].location_id] = 1
         events.append((uuid, df))
         if not user.has_perm(PERMISSION_CHANGE, series[uuid]):
@@ -1216,3 +1222,36 @@ class StatusCacheDetail(APIDetailView):
         else:
             qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
         return qs
+
+
+class Summary(APIReadOnlyListView):
+    def get(self, request, uuid=None):
+        total = Timeseries.objects.count()
+        disrupted_timeseries = Timeseries.objects.values('source__frequency') \
+            .extra(where=["latest_value_timestamp < now() - ddsc_core_source" \
+                          ".frequency * INTERVAL '1 SECOND'"]).count()
+
+        active_alarms = Alarm_Active.objects.filter(active=True).count()
+        status = StatusCache.objects.values('date') \
+            .annotate((Sum('nr_of_measurements_total'))) \
+            .order_by('-date')[:1]
+
+        if len(status) > 0 and 'nr_of_measurements_total__sum' in status[0]:
+            new_events = status[0]['nr_of_measurements_total__sum']
+        else:
+            new_events = 0
+
+        data = {
+            'timeseries' : {
+                'total' : total,
+                'disrupted' : disrupted_timeseries,
+            },
+            'alarms' : {
+                'active' : active_alarms,
+            },
+            'events' : {
+                'new' : new_events if new_events else 0,
+            }
+        }
+        return Response(data=data)
+
