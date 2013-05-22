@@ -17,6 +17,7 @@ from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.db.models import F, Sum
 from django.http import Http404, HttpResponse
 from django.utils.decorators import method_decorator
+from django.db.models import Q
 
 from rest_framework import exceptions as ex, generics
 from rest_framework.parsers import JSONParser, FormParser
@@ -61,7 +62,7 @@ COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
 FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%S.%fZ'
 
 mimetypes.init()
-from django.db.models import Q
+
 
 
 BOOL_LOOKUPS = ("isnull",)
@@ -86,12 +87,8 @@ def customfilter(view, qs, filter_json={}, order_field=None):
     :return:
     """
     filter_fields = {}
-    if view.customfilter_fields == '*':
-        check_filter_fields = False
-    else:
-        check_filter_fields = True
+    if not view.customfilter_fields == '*':
         for item in view.customfilter_fields:
-
             if type(item) == tuple:
                 filter_fields[item[0]] = item[1]
             else:
@@ -117,18 +114,19 @@ def customfilter(view, qs, filter_json={}, order_field=None):
             key = key.lstrip('-')
 
         #check if key is allowed
-        if check_filter_fields:
-            if not key in filter_fields.keys():
-                logger.warn('Property %s is not set for filtering.'%(key))
-                #raise InvalidKey(key)
-            elif  value:
-                if exclude:
-                    qs = qs.exclude(**{'%s__%s' % (filter_fields[key], lookup): value})
-                else:
-                    qs = qs.filter(**{'%s__%s' % (filter_fields[key], lookup): value})
+        if key in filter_fields.keys():
+            key = filter_fields[key]
+
+        if value:
+            if exclude:
+                qs = qs.exclude(**{'%s__%s' % (key, lookup): value})
+            else:
+                qs = qs.filter(**{'%s__%s' % (key, lookup): value})
 
     if order_field:
         order_field = order_field.replace('.','__')
+        if order_field in filter_fields:
+            order_field = filter_fields[order_field]
         qs = qs.order_by(order_field)
 
     return qs
@@ -328,8 +326,12 @@ class DataOwnerList(APIListView):
 
         if not self.request.user.is_authenticated():
             qs = self.model.objects.none()
+        elif self.request.user.is_superuser:
+            qs = qs
         elif self.request.QUERY_PARAMS.get('management', False):
             qs = qs.filter(data_managers=self.request.user)
+        else:
+            qs.filter(dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
 
         return qs.distinct()
 
@@ -352,7 +354,7 @@ class LocationList(APIListView):
     model = Location
     serializer_class = serializers.LocationListSerializer
 
-    customfilter_fields = ('uuid', 'name', )
+    customfilter_fields = ('id', 'uuid', 'name', ('owner', 'owner__name'), 'point_geometry', 'show_on_map')
 
     def get_queryset(self):
         qs = super(LocationList, self).get_queryset()
@@ -362,9 +364,9 @@ class LocationList(APIListView):
         elif self.request.user.is_superuser:
             qs = qs
         elif self.request.QUERY_PARAMS.get('management', False):
-            qs = qs.filter(owner__data_managers=self.request.user)
+            qs = qs.filter(Q(owner__data_managers=self.request.user)|Q(owner=None))
         else:
-            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
 
         #special filters
         kwargs = {}
@@ -390,15 +392,15 @@ class LocationDetail(APIDetailView):
     slug_url_kwarg = 'uuid'
 
     def get_queryset(self):
-        qs = super(SourceDetail, self).get_queryset()
+        qs = super(LocationDetail, self).get_queryset()
 
         if not self.request.user.is_authenticated():
             qs = self.model.objects.filter(timeseries__owner=None)
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(Q(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))|
-                            Q(owner__data_managers=self.request.user))
+            qs = qs.filter(Q(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())|
+                            Q(owner__data_managers=self.request.user)|Q(owner=None))
         return qs.distinct()
 
 
@@ -407,7 +409,7 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
-    customfilter_fields = ('uuid', 'name', 'location__name', ('parameter', 'parameter__code'),
+    customfilter_fields = ('id', 'uuid', 'name', 'location__name', ('parameter', 'parameter__code'),
                            ('unit', 'unit__code'), ('owner', 'owner__name'), 'source')
     select_related = ['location', 'parameter', 'unit', 'owner', 'source']
 
@@ -419,7 +421,7 @@ class TimeseriesList(APIListView):
         elif self.request.user.is_superuser:
             qs = qs
         elif self.request.QUERY_PARAMS.get('management', False):
-            qs = qs.filter(owner__data_managers=self.request.user)
+            qs = qs.filter(Q(owner__data_managers=self.request.user)|Q(owner=None))
             #    Q(data_set__permission_mappers__in=
             #         PermissionMapper.objects.filter(permission_group__permissions__codename='change_timeseries',
             #                                         user_group__members=self.request.user)
@@ -451,7 +453,7 @@ class TimeseriesDetail(APIDetailView):
     serializer_class = serializers.TimeseriesDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
-    select_related = ['location', 'parameter', 'unit', 'source', 'owner', 'processing_method', 'measuring_method',
+    select_related = ['id', 'location', 'parameter', 'unit', 'source', 'owner', 'processing_method', 'measuring_method',
                       'measuring_device', 'compartment', 'reference_frame']
 
     def get_queryset(self):
@@ -462,8 +464,8 @@ class TimeseriesDetail(APIDetailView):
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user)) |
-                           Q(owner__data_managers=self.request.user))
+            qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct()) |
+                           Q(owner__data_managers=self.request.user)|Q(owner=None))
         return qs.distinct()
 
 
@@ -788,7 +790,7 @@ class EventDetail(BaseEventView):
 class SourceList(APIListView):
     model = Source
     serializer_class = serializers.SourceListSerializer
-    customfilter_fields = ('uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout')
+    customfilter_fields = ('id', 'uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout')
     select_related = ['manufacturer']
 
     def get_queryset(self):
@@ -799,9 +801,9 @@ class SourceList(APIListView):
         elif self.request.user.is_superuser:
             qs = qs
         elif self.request.QUERY_PARAMS.get('management', False):
-            qs = qs.filter(owner__data_managers=self.request.user)
+            qs = qs.filter(Q(owner__data_managers=self.request.user)|Q(owner=None))
         else:
-            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
 
         return qs.distinct()
 
@@ -821,8 +823,8 @@ class SourceDetail(APIDetailView):
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(Q(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))|
-                            Q(owner__data_managers=self.request.user))
+            qs = qs.filter(Q(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())|
+                            Q(owner__data_managers=self.request.user)|Q(owner=None))
 
         return qs.distinct()
 
@@ -842,7 +844,7 @@ class LogicalGroupList(APIListView):
         elif self.request.QUERY_PARAMS.get('management', False):
             qs = qs.filter(owner__data_managers=self.request.user)
         else:
-            qs = qs.filter(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+            qs = qs.filter(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
 
         #special filters
         kwargs = {}
@@ -897,9 +899,9 @@ class LogicalGroupDetail(APIDetailView):
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(Q(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))|
+            qs = qs.filter(Q(owner__dataset__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())|
                              Q(owner__data_managers=self.request.user))
-        return qs
+        return qs.distinct()
 
     def post_save(self, obj, created=True):
         """
@@ -1199,7 +1201,7 @@ class StatusCacheList(APIListView):
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
 
         return qs.distinct()
 
@@ -1220,7 +1222,7 @@ class StatusCacheDetail(APIDetailView):
         elif self.request.user.is_superuser:
             qs = qs
         else:
-            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+            qs = qs.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
         return qs
 
 

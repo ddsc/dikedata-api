@@ -195,6 +195,8 @@ class SourceListSerializer(BaseSerializer):
         view_name='source-detail', slug_field='uuid')
     manufacturer = ManufacturerRefSerializer(slug_field='name')
     source_type = fields.DictChoiceField(choices=Source.SOURCE_TYPES)
+    owner = DataOwnerRefSerializer(slug_field='name')
+
 
     class Meta:
         model = Source
@@ -241,6 +243,17 @@ class AlarmSettingRefSerializer(serializers.SlugRelatedField):
         model = Alarm
 
 
+class ContentObjectSerializer(serializers.Field):
+
+
+    def field_to_native(self, obj, field):
+        item = getattr(obj, 'content_object')
+        if item:
+            return item.name
+        else:
+            return None
+
+
 class AlarmItemDetailSerializer(BaseSerializer):
 
     comparision = fields.DictChoiceField(choices=Alarm_Item.COMPARISION_TYPE)
@@ -248,10 +261,12 @@ class AlarmItemDetailSerializer(BaseSerializer):
     value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
     alarm_type = ModelRefSerializer(slug_field = 'name')
     alarm = AlarmSettingRefSerializer(slug_field='id')
+    content_object_name = ContentObjectSerializer()
 
     class Meta:
         model = Alarm_Item
         exclude = ('alarm', )
+        #read_only_fields = ('content_object_name', )
 
 
 class AlarmSettingDetailSerializer(BaseSerializer):
@@ -264,7 +279,7 @@ class AlarmSettingDetailSerializer(BaseSerializer):
     class Meta:
         model = Alarm
         exclude = ('single_or_group', 'previous_alarm', )
-        read_only = ('previous_alarm', )
+        read_only_fields = ('previous_alarm', )
 
 
 class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
@@ -332,6 +347,8 @@ class LocationDetailSerializer(BaseSerializer):
         view_name='location-detail', slug_field='uuid', read_only=True)
     point_geometry = fields.GeometryPointField()
     srid = serializers.Field(source='get_srid')
+    owner = DataOwnerRefSerializer(slug_field='name')
+
 
     def save_object(self, obj, **kwargs):
         obj.save_under(parent_pk=None)

@@ -117,7 +117,7 @@ class GeometryPointField(serializers.Field):
         print '------------------------------'
         print value
         srid = int(data.get('srid', 4258))
-        if value and len(value) > 0:
+        if value and len(value) > 0 and len(value[0]) > 0:
             if len(value) < 2:
                 value = value[0].split(',')
             values = [float(v) for v in value]
@@ -125,4 +125,6 @@ class GeometryPointField(serializers.Field):
             if srid != 4258:
                 geo_input_clone = geo_input.transform(4258, clone=True)
             into[field_name] = geo_input
-        return geo_input
+            return geo_input
+        else:
+            return ''
