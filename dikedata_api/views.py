@@ -1201,7 +1201,7 @@ class StatusCacheList(APIListView):
         qs = super(StatusCacheList, self).get_queryset()
 
         if not self.request.user.is_authenticated():
-            qs = self.model.filter(timeseries__owner=None)
+            qs = self.model.objects.none()
         elif self.request.user.is_superuser:
             qs = qs
         else:
@@ -1222,7 +1222,7 @@ class StatusCacheDetail(APIDetailView):
         qs = super(StatusCacheDetail, self).get_queryset()
 
         if not self.request.user.is_authenticated():
-            qs = self.model.filter(timeseries__owner=None)
+            qs = self.model.objects.none()
         elif self.request.user.is_superuser:
             qs = qs
         else:
