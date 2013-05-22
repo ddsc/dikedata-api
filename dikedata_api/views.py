@@ -77,7 +77,7 @@ class InvalidKey(ParseError):
         super(ParseError, self).__init__(message)
 
 
-def customfilter(view, qs, filter_json={}, order_field=None):
+def customfilter(view, qs, filter_json=None, order_field=None):
     """
     Function for adding filters to queryset.
     set 'customfilter_fields for allowed fields'
@@ -96,7 +96,11 @@ def customfilter(view, qs, filter_json={}, order_field=None):
 
     exclude = False
 
-    filter_dict = json.loads(filter_json)
+    if filter_json:
+        filter_dict = json.loads(filter_json)
+    else:
+        filter_dict = {}
+
     for key, value in filter_dict.items():
         #support for points in stead of double underscores
         key = key.replace('.', '__')
@@ -186,7 +190,7 @@ class APIReadOnlyListView(mixins.BaseMixin, mixins.GetListModelMixin,
 
     def get_queryset(self):
         qs = self.model.objects
-        filter = self.request.QUERY_PARAMS.get('filter', {})
+        filter = self.request.QUERY_PARAMS.get('filter', None)
         order = self.request.QUERY_PARAMS.get('order', None)
         if filter or order:
             qs = customfilter(self, qs, filter, order)
@@ -1228,20 +1232,36 @@ class StatusCacheDetail(APIDetailView):
 
 class Summary(APIReadOnlyListView):
     def get(self, request, uuid=None):
-        total = Timeseries.objects.count()
-        disrupted_timeseries = Timeseries.objects.values('source__frequency') \
-            .extra(where=["latest_value_timestamp < now() - ddsc_core_source" \
-                          ".frequency * INTERVAL '1 SECOND'"]).count()
 
-        active_alarms = Alarm_Active.objects.filter(active=True).count()
-        status = StatusCache.objects.values('date') \
-            .annotate((Sum('nr_of_measurements_total'))) \
-            .order_by('-date')[:1]
-
-        if len(status) > 0 and 'nr_of_measurements_total__sum' in status[0]:
-            new_events = status[0]['nr_of_measurements_total__sum']
-        else:
+        if not request.user.is_authenticated():
+            total = 0
+            disrupted_timeseries = 0
+            active_alarms = 0
             new_events = 0
+        else:
+            ts_manager = Timeseries.objects
+            aa_manager = Alarm_Active.objects
+            sc_manager = StatusCache.objects
+
+            if not request.user.is_superuser:
+                ts_manager = ts_manager.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=request.user))
+                aa_manager = aa_manager.filter(alarm__object_id=request.user.id)
+                sc_manager = sc_manager.filter(timeseries__data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=request.user))
+
+            total = ts_manager.count()
+            disrupted_timeseries = ts_manager.values('source__frequency').extra(
+                where=["latest_value_timestamp < now() - ddsc_core_source" \
+                       ".frequency * INTERVAL '1 SECOND'"]).count()
+
+            active_alarms = aa_manager.filter(active=True).count()
+            status = sc_manager.values('date') \
+                .annotate((Sum('nr_of_measurements_total'))) \
+                .order_by('-date')[:1]
+    
+            if len(status) > 0 and 'nr_of_measurements_total__sum' in status[0]:
+                new_events = status[0]['nr_of_measurements_total__sum']
+            else:
+                new_events = 0
 
         data = {
             'timeseries' : {
