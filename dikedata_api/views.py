@@ -105,7 +105,7 @@ def customfilter(view, qs, filter_json=None, order_field=None):
         #support for points in stead of double underscores
         key = key.replace('.', '__')
         #get key and lookup
-        possible_lookup = key.rsplit('__',1)
+        possible_lookup = key.rsplit('__', 1)
         if len(possible_lookup) == 2 and possible_lookup[1] in ALL_LOOKUPS:
             key = possible_lookup[0]
             lookup = possible_lookup[1]
@@ -113,9 +113,9 @@ def customfilter(view, qs, filter_json=None, order_field=None):
             lookup = 'exact'
 
         #check on include or exclude
-        if key.startswith('-'):
+        if type(value) == unicode and value.startswith('#'):
             exclude = True
-            key = key.lstrip('-')
+            value = value.lstrip('#')
 
         #check if key is allowed
         if key in filter_fields.keys():
@@ -129,8 +129,18 @@ def customfilter(view, qs, filter_json=None, order_field=None):
 
     if order_field:
         order_field = order_field.replace('.','__')
+
+        reverse = False
+        if order_field.startswith('-'):
+            reverse = True
+            order_field = order_field.lstrip('-')
+
         if order_field in filter_fields:
             order_field = filter_fields[order_field]
+
+        if reverse:
+            order_field = '-' + order_field
+
         qs = qs.order_by(order_field)
 
     return qs
@@ -413,8 +423,8 @@ class TimeseriesList(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
 
-    customfilter_fields = ('id', 'uuid', 'name', 'location__name', ('parameter', 'parameter__code'),
-                           ('unit', 'unit__code'), ('owner', 'owner__name'), 'source')
+    customfilter_fields = ('id', 'uuid', 'name', ('location', 'location__name'), ('parameter', 'parameter__code',),
+                           ('unit', 'unit__code',), ('owner', 'owner__name',), ('source', 'source__name',))
     select_related = ['location', 'parameter', 'unit', 'owner', 'source']
 
     def get_queryset(self):
@@ -431,7 +441,7 @@ class TimeseriesList(APIListView):
             #                                         user_group__members=self.request.user)
             #   ))
         else:
-            qs = qs.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user))
+            qs = qs.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
 
         kwargs = {}
         logicalgroup = self.request.QUERY_PARAMS.get('logicalgroup', None)
@@ -457,7 +467,7 @@ class TimeseriesDetail(APIDetailView):
     serializer_class = serializers.TimeseriesDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
-    select_related = ['id', 'location', 'parameter', 'unit', 'source', 'owner', 'processing_method', 'measuring_method',
+    select_related = ['location', 'parameter', 'unit', 'source', 'owner', 'processing_method', 'measuring_method',
                       'measuring_device', 'compartment', 'reference_frame']
 
     def get_queryset(self):
@@ -471,7 +481,6 @@ class TimeseriesDetail(APIDetailView):
             qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct()) |
                            Q(owner__data_managers=self.request.user)|Q(owner=None))
         return qs.distinct()
-
 
 
 class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
@@ -537,7 +546,16 @@ class EventList(BaseEventView):
 
 
     def get(self, request, uuid=None):
-        ts = Timeseries.objects.get(uuid=uuid)
+
+        qs = Timeseries.objects
+        if not self.request.user.is_authenticated():
+            qs = Timeseries.objects.none()
+        elif self.request.user.is_superuser:
+            qs = Timeseries.objects
+        else:
+            qs = Timeseries.objects.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
+
+        ts = qs.get(uuid=uuid)
         headers = {}
 
         # grab GET parameters
@@ -794,8 +812,9 @@ class EventDetail(BaseEventView):
 class SourceList(APIListView):
     model = Source
     serializer_class = serializers.SourceListSerializer
-    customfilter_fields = ('id', 'uuid', 'name', ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout')
-    select_related = ['manufacturer']
+    customfilter_fields = ('id', 'uuid', 'name', ('owner', 'owner__name',),
+                           ('manufacturer', 'manufacturer__name',), 'details', 'frequency', 'timeout')
+    select_related = ['manufacturer', 'owner']
 
     def get_queryset(self):
         qs = super(SourceList, self).get_queryset()
@@ -817,7 +836,7 @@ class SourceDetail(APIDetailView):
     serializer_class = serializers.SourceDetailSerializer
     slug_field = 'uuid'
     slug_url_kwarg = 'uuid'
-    select_related = ['manufacturer']
+    select_related = ['manufacturer', 'owner']
 
     def get_queryset(self):
         qs = super(SourceDetail, self).get_queryset()
