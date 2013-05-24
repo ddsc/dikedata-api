@@ -15,9 +15,9 @@ class BaseMixin(object):
             raise getattr(request, 'AUTHENTICATION_EXCEPTION')
         return super(BaseMixin, self).initial(request, *args, **kwargs)
 
-    # def handle_exception(self, exc):
-    #     wrapped = APIException(exc)
-    #     return super(BaseMixin, self).handle_exception(wrapped)
+    def handle_exception(self, exc):
+        wrapped = APIException(exc)
+        return super(BaseMixin, self).handle_exception(wrapped)
 
 
 class GetListModelMixin(mixins.ListModelMixin):
