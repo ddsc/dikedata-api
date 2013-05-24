@@ -638,7 +638,8 @@ class LogicalGroupParentRefSerializer(BaseSerializer):
 
 class LogicalGroupDetailSerializer(BaseSerializer):
     id = serializers.Field('id')
-    timeseries = RecursiveTimeseriesSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
+    #timeseries = RecursiveTimeseriesSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
+    timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
     parents = LogicalGroupParentRefSerializer(many=True, read_only=True)
     childs = fields.ManyHyperlinkedChilds(
         view_name='logicalgroup-detail', read_only=True)
