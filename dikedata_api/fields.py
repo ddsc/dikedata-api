@@ -98,12 +98,14 @@ class DictChoiceField(serializers.ChoiceField):
     def to_native(self, value):
         #get display value
         choices_dict = dict(self._choices)
-        return choices_dict[value]
+        if value in choices_dict:
+            return choices_dict[value]
+        else:
+            return 'unknown choice (%s)'%str(value)
 
     def from_native(self, value):
         #get value from display value (assuming that display values are unique)
         choices_dict = dict([(a[1],a[0]) for a in self._choices])
-        print choices_dict[value]
         return choices_dict[value]
 
 
