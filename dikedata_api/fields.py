@@ -4,7 +4,7 @@ from __future__ import unicode_literals
 from rest_framework import fields, serializers
 from rest_framework.reverse import reverse
 from django.conf import settings
-from django.contrib.gis.geos import GEOSGeometry, Point
+from django.contrib.gis.geos import Point
 
 COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
 
@@ -116,8 +116,6 @@ class GeometryPointField(serializers.Field):
         get geometry object
         """
         value = data.getlist(field_name, None)
-        print '------------------------------'
-        print value
         srid = int(data.get('srid', 4258))
         if value and len(value) > 0 and len(value[0]) > 0:
             if len(value) < 2:
@@ -125,7 +123,7 @@ class GeometryPointField(serializers.Field):
             values = [float(v) for v in value]
             geo_input = Point(*values, srid=srid)
             if srid != 4258:
-                geo_input_clone = geo_input.transform(4258, clone=True)
+                geo_input = geo_input.transform(4258, clone=True)
             into[field_name] = geo_input
             return geo_input
         else:
