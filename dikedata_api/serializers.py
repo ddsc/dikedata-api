@@ -15,7 +15,6 @@ from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
-from rest_framework import fields as rest_fields
 from lizard_security.models import DataOwner, DataSet, UserGroup, PermissionMapper
 from django.contrib.contenttypes.models import ContentType
 
@@ -76,6 +75,7 @@ class AquoRelatedSerializer(serializers.SlugRelatedField):
         item = getattr(obj, field)
         if item:
             return {'id': item.id, 'code': item.code, 'description': item.description}
+
 
 class ParameterRelSerializer(AquoRelatedSerializer):
     """
@@ -197,7 +197,6 @@ class SourceListSerializer(BaseSerializer):
     source_type = fields.DictChoiceField(choices=Source.SOURCE_TYPES)
     owner = DataOwnerRefSerializer(slug_field='name')
 
-
     class Meta:
         model = Source
         fields = ('id', 'uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
@@ -222,8 +221,6 @@ class SourceRefSerializer(serializers.SlugRelatedField):
             return {'uuid': item.uuid, 'name': item.name}
 
 
-
-
 class AlarmDetailSerializer(BaseSerializer):
     # alarm = serializers.SerializerMethodField('get_alarm_type')
 
@@ -237,6 +234,7 @@ class ModelRefSerializer(serializers.SlugRelatedField):
     class Meta:
         model = ContentType
 
+
 class AlarmSettingRefSerializer(serializers.SlugRelatedField):
 
     class Meta:
@@ -244,7 +242,6 @@ class AlarmSettingRefSerializer(serializers.SlugRelatedField):
 
 
 class ContentObjectSerializer(serializers.Field):
-
 
     def field_to_native(self, obj, field):
         item = getattr(obj, 'content_object')
@@ -259,7 +256,7 @@ class AlarmItemDetailSerializer(BaseSerializer):
     comparision = fields.DictChoiceField(choices=Alarm_Item.COMPARISION_TYPE)
     logical_check = fields.DictChoiceField(choices=Alarm_Item.LOGIC_TYPES)
     value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
-    alarm_type = ModelRefSerializer(slug_field = 'name')
+    alarm_type = ModelRefSerializer(slug_field='name')
     alarm = AlarmSettingRefSerializer(slug_field='id')
     content_object_name = ContentObjectSerializer()
 
@@ -279,7 +276,12 @@ class AlarmSettingDetailSerializer(BaseSerializer):
     class Meta:
         model = Alarm
         exclude = ('single_or_group', 'previous_alarm', )
-        read_only_fields = ('previous_alarm', )
+        read_only_fields = (
+            'date_cr',
+            'first_born',
+            'last_checked',
+            'previous_alarm',
+        )
 
 
 class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
@@ -348,7 +350,6 @@ class LocationDetailSerializer(BaseSerializer):
     point_geometry = fields.GeometryPointField()
     srid = serializers.Field(source='get_srid')
     owner = DataOwnerRefSerializer(slug_field='name')
-
 
     def save_object(self, obj, **kwargs):
         obj.save_under(parent_pk=None)
@@ -491,7 +492,6 @@ class TimeseriesSmallListSerializer(TimeseriesDetailSerializer):
     parameter = serializers.SlugRelatedField(slug_field='code')
     #location = fields.RelatedField(model_field='uuid')
 
-
     class Meta:
         model = Timeseries
         fields = ('id', 'url', 'uuid', 'name', 'parameter', 'latest_value', 'value_type',)
@@ -581,11 +581,11 @@ class RoleSerializer(serializers.SlugRelatedField):
     class Meta:
         model = Role
 
+
 class UserGroupSerializer(serializers.SlugRelatedField):
 
     class Meta:
         model = UserGroup
-
 
 
 class PermissionMapperSerializer(serializers.ModelSerializer):
@@ -635,7 +635,6 @@ class LogicalGroupParentRefSerializer(BaseSerializer):
 
 
 
-
 class LogicalGroupDetailSerializer(BaseSerializer):
     id = serializers.Field('id')
     #timeseries = RecursiveTimeseriesSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
@@ -662,6 +661,7 @@ class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
 class StatusCacheDetailSerializer(BaseSerializer):
 
     timeseries = TimeseriesSmallListSerializer()
+
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )
@@ -670,6 +670,7 @@ class StatusCacheDetailSerializer(BaseSerializer):
 class StatusCacheListSerializer(StatusCacheDetailSerializer):
 
     timeseries = TimeseriesSmallListSerializer()
+
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )
