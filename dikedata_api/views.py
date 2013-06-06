@@ -553,7 +553,7 @@ class EventList(BaseEventView):
         elif self.request.user.is_superuser:
             qs = Timeseries.objects
         else:
-            qs = Timeseries.objects.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct())
+            qs = Timeseries.objects.filter(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct()).distinct()
 
         ts = qs.get(uuid=uuid)
         headers = {}
