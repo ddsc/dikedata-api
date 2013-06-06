@@ -80,17 +80,7 @@ class LatestValue(serializers.HyperlinkedIdentityField):
 class OpenDAPLink(serializers.HyperlinkedIdentityField):
     def field_to_native(self, obj, field_name):
         opendap_url = getattr(settings, 'OPENDAP_BASE_URL', '')
-        request = self.context.get('request', None)
-        format = request.QUERY_PARAMS.get('format', None)
-
-        format_map = {
-            'api': 'html',
-            'json': 'ascii',
-        }
-        if format in format_map:
-            opendap_format = format_map[format]
-        else:
-            opendap_format = 'html'
+        opendap_format = 'ascii'
         return "%s/%s.%s" % (opendap_url, obj.uuid, opendap_format)
 
 
