@@ -77,7 +77,7 @@ class LatestValue(serializers.HyperlinkedIdentityField):
         return obj.latest_value()
 
 
-class OpenDAPLink(serializers.HyperlinkedIdentityField):
+class OpenDAPLink(serializers.Field):
     def field_to_native(self, obj, field_name):
         opendap_url = getattr(settings, 'OPENDAP_BASE_URL', '')
         opendap_format = 'ascii'
