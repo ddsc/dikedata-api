@@ -1,18 +1,20 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
-from rest_framework import fields, serializers
-from rest_framework.reverse import reverse
 from django.conf import settings
 from django.contrib.gis.geos import Point
+from rest_framework import fields, serializers
+from rest_framework.reverse import reverse
 
-COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
+from ddsc_core.utils import transform
+
+COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ'  # supports milliseconds
 
 
 class AquoField(fields.Field):
     class Meta:
         fields = ('id', 'code', 'description')
-    
+
     def to_native(self, obj):
         return dict([(k, getattr(obj, k, None)) for k in self.Meta.fields])
 
@@ -91,11 +93,11 @@ class DictChoiceField(serializers.ChoiceField):
         if value in choices_dict:
             return choices_dict[value]
         else:
-            return 'unknown choice (%s)'%str(value)
+            return 'unknown choice (%s)' % str(value)
 
     def from_native(self, value):
         #get value from display value (assuming that display values are unique)
-        choices_dict = dict([(a[1],a[0]) for a in self._choices])
+        choices_dict = dict([(a[1], a[0]) for a in self._choices])
         return choices_dict[value]
 
 
@@ -113,7 +115,7 @@ class GeometryPointField(serializers.Field):
             values = [float(v) for v in value]
             geo_input = Point(*values, srid=srid)
             if srid != 4258:
-                geo_input = geo_input.transform(4258, clone=True)
+                geo_input = transform(geo_input, 4258, clone=True)
             into[field_name] = geo_input
             return geo_input
         else:
