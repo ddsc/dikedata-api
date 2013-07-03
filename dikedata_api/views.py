@@ -286,14 +286,23 @@ class UserDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
     serializer_class = serializers.UserDetailSerializer
 
 
-class GroupList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
+class UserGroupList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
     model = UserGroup
-    serializer_class = serializers.GroupListSerializer
+    serializer_class = serializers.UserGroupListSerializer
+
+class UserGroupDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
+    model = UserGroup
+    serializer_class = serializers.UserGroupDetailSerializer
 
 
-class GroupDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
-    model = UserGroup
-    serializer_class = serializers.GroupDetailSerializer
+class PermissionMapperList(mixins.ProtectedListModelMixin, APIReadOnlyListView):
+    model = PermissionMapper
+    serializer_class = serializers.PermissionMapperSerializer
+
+
+class PermissionMapperDetail(mixins.ProtectedDetailModelMixin, APIDetailView):
+    model = PermissionMapper
+    serializer_class = serializers.PermissionMapperSerializer
 
 
 class RoleList(mixins.ProtectedListModelMixin, APIReadOnlyListView):

@@ -14,6 +14,7 @@ from ddsc_core.models.aquo import Unit
 from dikedata_api import fields
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
+from django.utils import simplejson as json
 from rest_framework import serializers
 from lizard_security.models import DataOwner, DataSet, UserGroup, PermissionMapper
 from django.contrib.contenttypes.models import ContentType
@@ -133,13 +134,13 @@ class UserDetailSerializer(BaseSerializer):
         exclude = ('password', 'groups', 'user_permissions', )
 
 
-class GroupListSerializer(BaseSerializer):
+class UserGroupListSerializer(BaseSerializer):
     class Meta:
         model = UserGroup
-        fields = ('url', 'name', )
+        fields = ('id', 'url', 'name', )
 
 
-class GroupDetailSerializer(BaseSerializer):
+class UserGroupDetailSerializer(BaseSerializer):
     class Meta:
         model = UserGroup
 
@@ -582,25 +583,37 @@ class RoleSerializer(serializers.SlugRelatedField):
         model = Role
 
 
-class UserGroupSerializer(serializers.SlugRelatedField):
-
-    class Meta:
-        model = UserGroup
-
-
-class PermissionMapperSerializer(serializers.ModelSerializer):
-    permission_group = RoleSerializer(slug_field='name')
-    user_group = UserGroupSerializer(slug_field='name')
+class PermissionMapperSerializer(BaseSerializer):
+    #permission_group = RoleSerializer(slug_field='pk')
+    #user_group = UserGroupSerializer(slug_field='pk')
+    #permission_group = serializers.HyperlinkedRelatedField(view_name='role-detail')
+    #user_group = serializers.HyperlinkedRelatedField(view_name='usergroup-detail')
+    permission_group = serializers.PrimaryKeyRelatedField()
+    user_group = serializers.PrimaryKeyRelatedField()
+    data_set = serializers.HyperlinkedRelatedField(view_name='dataset-detail')
 
     class Meta:
         model = PermissionMapper
         exclude = ['data_set']
 
+    def field_from_native(self, data, files, field_name, into):
+        permission_mappers = []
+        for pm_json in data.getlist('permission_mappers'):
+            pm_data = json.loads(pm_json)
+            if 'id' in pm_data:
+                pm = PermissionMapper.objects.get(pk=pm_data['id'])
+            else:
+                pm = PermissionMapper()
+            pm.permission_group = Role.objects.get(pk=pm_data['permission_group'])
+            pm.user_group = UserGroup.objects.get(pk=pm_data['user_group'])
+            permission_mappers.append(pm)
+        into['permission_mappers'] = permission_mappers
+
 
 class DataSetDetailSerializer(BaseSerializer):
     timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
     owner = DataOwnerRefSerializer(slug_field='name')
-    permission_mappers = PermissionMapperSerializer(read_only=True)
+    permission_mappers = PermissionMapperSerializer(many=True)
 
     class Meta:
         model = DataSet
