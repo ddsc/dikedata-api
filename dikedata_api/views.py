@@ -29,6 +29,7 @@ from rest_framework.pagination import PaginationSerializer
 from rest_framework.exceptions import ParseError
 from rest_framework import status
 from rest_framework.request import clone_request
+from haystack.query import SearchQuerySet
 
 import numpy as np
 
@@ -427,6 +428,22 @@ class LocationDetail(APIDetailView):
         return qs.distinct()
 
 
+class LocationSearch(APIListView):
+    model = Location
+    serializer_class = serializers.LocationSearchSerializer
+
+    def get_queryset(self):
+        query = self.request.QUERY_PARAMS.get('q', None)
+        sqs = SearchQuerySet().models(Timeseries).filter(
+            content__startswith=query)
+        qs = []
+        for item in sqs:
+            location = item.object.location
+            if location not in qs:
+                qs.append(location)
+        return qs
+
+
 
 class TimeseriesList(APIListView):
     model = Timeseries
@@ -468,6 +485,9 @@ class TimeseriesList(APIListView):
         name = self.request.QUERY_PARAMS.get('name', None)
         if name:
             kwargs['name__icontains'] = name
+        source = self.request.QUERY_PARAMS.get('source', None)
+        if source:
+            kwargs['source__name__icontains'] = source
         return qs.filter(**kwargs).distinct()
 
 
@@ -490,6 +510,18 @@ class TimeseriesDetail(APIDetailView):
             qs = qs.filter(Q(data_set__in=DataSet.objects.filter(permission_mappers__user_group__members=self.request.user).distinct()) |
                            Q(owner__data_managers=self.request.user)|Q(owner=None))
         return qs.distinct()
+
+
+class TimeseriesSearch(APIListView):
+    model = Timeseries
+    serializer_class = serializers.TimeseriesSearchSerializer
+
+    def get_queryset(self):
+        query = self.request.QUERY_PARAMS.get('q', None)
+        sqs = SearchQuerySet().models(Timeseries).filter(
+            content__startswith=query)
+        return sqs
+
 
 
 class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):
@@ -638,7 +670,13 @@ class EventList(BaseEventView):
                 ignore_rejected=ignore_rejected)
             timer_get_events = datetime.now() - timer_start
             response = self.format_flot(request, ts, df, start, end, timer_get_events=timer_get_events)
-
+            if len(df) == 0:
+                df = ts.get_events(
+                    start=None,
+                    end=None,
+                    filter=filter,
+                    ignore_rejected=ignore_rejected)
+                response = self.format_flot(request, ts, df, start, end)
         return Response(data=response, headers=headers)
 
     @staticmethod
