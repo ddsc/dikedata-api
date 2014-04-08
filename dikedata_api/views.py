@@ -430,17 +430,24 @@ class LocationDetail(APIDetailView):
 
 class LocationSearch(APIListView):
     model = Location
-    serializer_class = serializers.LocationSearchSerializer
+    serializer_class = serializers.LocationListSerializer
 
     def get_queryset(self):
-        query = self.request.QUERY_PARAMS.get('q', None)
-        sqs = SearchQuerySet().models(Timeseries).filter(
-            content__startswith=query)
-        qs = []
-        for item in sqs:
-            location = item.object.location
-            if location not in qs:
-                qs.append(location)
+        if not self.request.user.is_authenticated():
+            qs = []
+        else:
+            query = self.request.QUERY_PARAMS.get('q', None)
+            sqs = SearchQuerySet().models(Timeseries).filter(
+                content__startswith=query)
+            sqs = sqs.filter_or(location_name__startswith=query)
+            sqs = sqs.filter_or(name__startswith=query)
+            qs = []
+            for item in sqs:
+                location = item.object.location
+                if (location not in qs and 
+                        (location.owner == None or 
+                        location.owner == self.request.user)):
+                    qs.append(location)
         return qs
 
 
@@ -514,13 +521,25 @@ class TimeseriesDetail(APIDetailView):
 
 class TimeseriesSearch(APIListView):
     model = Timeseries
-    serializer_class = serializers.TimeseriesSearchSerializer
+    serializer_class = serializers.TimeseriesListSerializer
 
     def get_queryset(self):
-        query = self.request.QUERY_PARAMS.get('q', None)
-        sqs = SearchQuerySet().models(Timeseries).filter(
-            content__startswith=query)
-        return sqs
+        if not self.request.user.is_authenticated():
+            qs = []
+        else:
+            query = self.request.QUERY_PARAMS.get('q', None)
+            sqs = SearchQuerySet().models(Timeseries).filter(
+                content__startswith=query)
+            sqs = sqs.filter_or(location_name__startswith=query)
+            sqs = sqs.filter_or(name__startswith=query)
+            qs = []
+            for item in sqs:
+                timeseries = item.object
+                if (timeseries not in qs and 
+                    (timeseries.owner == None or 
+                    timeseries.owner == self.request.user)):
+                    qs.append(timeseries)
+        return qs
 
 
 

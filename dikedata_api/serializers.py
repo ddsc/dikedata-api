@@ -403,28 +403,6 @@ class LocationListSerializer(LocationDetailSerializer):
         )
 
 
-class LocationSearchSerializer(LocationDetailSerializer):
-
-    # def to_native(self, obj):
-    #     return super(LocationSearchSerializer, self).to_native(obj.object.location)
-
-    class Meta:
-        model = Location
-        fields = ('id',
-                  'url',
-                  'uuid',
-                  'name',
-                  'owner',
-                  'show_on_map',
-                  'point_geometry',
-                  'srid')
-
-        read_only_fields = (
-            'path',
-            'depth',
-        )
-
-
 class LocationRefSerializer(serializers.SlugRelatedField):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
@@ -502,20 +480,6 @@ class TimeseriesListSerializer(TimeseriesDetailSerializer):
     unit = serializers.SlugRelatedField(slug_field='code')
     parameter = serializers.SlugRelatedField(slug_field='code')
     #location = fields.RelatedField(model_field='uuid')
-
-    class Meta:
-        model = Timeseries
-        fields = ('id', 'url', 'uuid', 'name', 'location', 'latest_value_timestamp', 'latest_value', 'events', 'value_type',
-                  'parameter', 'unit', 'owner', 'source')
-        depth = 2
-
-
-class TimeseriesSearchSerializer(TimeseriesDetailSerializer):
-    unit = serializers.SlugRelatedField(slug_field='code')
-    parameter = serializers.SlugRelatedField(slug_field='code')
-
-    def to_native(self, obj):
-        return super(TimeseriesSearchSerializer, self).to_native(obj.object)
 
     class Meta:
         model = Timeseries
