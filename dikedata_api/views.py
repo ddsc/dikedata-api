@@ -446,7 +446,8 @@ class LocationSearch(APIListView):
                 location = item.object.location
                 if (location not in qs and 
                         (location.owner == None or 
-                        location.owner == self.request.user)):
+                        self.request.user in location.owner.data_managers.all() or
+                        self.request.user.is_superuser)):
                     qs.append(location)
         return qs
 
