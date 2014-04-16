@@ -7,6 +7,8 @@ import logging
 import mimetypes
 import time
 import json
+import requests
+import numpy as np
 
 from django.conf import settings
 from django.contrib.auth import authenticate, login
@@ -31,7 +33,6 @@ from rest_framework import status
 from rest_framework.request import clone_request
 from haystack.query import SearchQuerySet
 
-import numpy as np
 
 from tls import TLSRequestMiddleware
 
@@ -428,11 +429,11 @@ class LocationDetail(APIDetailView):
         return qs.distinct()
 
 
-class LocationSearch(APIListView):
-    model = Location
-    serializer_class = serializers.LocationListSerializer
-
-    def get_queryset(self):
+class LocationSearch(APIView):
+    '''
+        Hybrid response. Geocode and searchresult.
+    '''
+    def get(self, request):
         if not self.request.user.is_authenticated():
             qs = []
         else:
@@ -441,6 +442,7 @@ class LocationSearch(APIListView):
                 content__startswith=query)
             sqs = sqs.filter_or(location_name__startswith=query)
             sqs = sqs.filter_or(name__startswith=query)
+
             qs = []
             for item in sqs:
                 location = item.object.location
@@ -448,8 +450,33 @@ class LocationSearch(APIListView):
                         (location.owner == None or 
                         self.request.user in location.owner.data_managers.all() or
                         self.request.user.is_superuser)):
-                    qs.append(location)
-        return qs
+                    location_json = serializers.LocationListSerializer(location).data
+                    # import ipdb;ipdb.set_trace()
+                    location_json['geocode'] = False
+                    qs.append(location_json)
+
+            # geocoding.
+            geocode = requests.get('http://nominatim.openstreetmap.org/'
+                'search?viewbox=8.668,53.520716,2.07641601,50.8198&'
+                'bounded=1&addressdetails=0&'
+                'format=json&limit=1&q=' + str(query))
+            geocode = geocode.json()
+            if query:
+                for result in geocode:
+                    result = {
+                        'point_geometry': [
+                            float(result['lon']), 
+                            float(result['lat'])
+                            ],
+                        'id': '9999999',
+                        'uuid': 'geocode',
+                        'name': result['display_name'].split(',')[0],
+                        'geocode': True
+                    }
+
+                    qs.append(result)
+
+        return Response(qs, status=status.HTTP_200_OK)
 
 
 
