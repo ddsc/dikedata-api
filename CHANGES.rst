@@ -5,7 +5,7 @@ Changelog of dikedata-api
 0.2 (unreleased)
 ----------------
 
-- Nothing changed yet.
+- Make dikedata-api compatible with Django 1.5.4.
 
 
 0.1 (2012-11-16)
