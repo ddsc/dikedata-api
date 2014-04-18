@@ -1,27 +1,42 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
+
 from __future__ import unicode_literals
 
-from ddsc_core.models import (
-    Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge,
-    Manufacturer, Source, StatusCache, Timeseries
-    )
-from ddsc_core.models.aquo import Compartment
-from ddsc_core.models.aquo import MeasuringDevice
-from ddsc_core.models.aquo import MeasuringMethod
-from ddsc_core.models.aquo import Parameter
-from ddsc_core.models.aquo import ProcessingMethod
-from ddsc_core.models.aquo import ReferenceFrame
-from ddsc_core.models.aquo import Unit
-
-from dikedata_api import fields
-from django.contrib.auth.models import User, Group as Role
+from django.contrib.auth.models import Group as Role, User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.utils import simplejson as json
+
 from rest_framework import serializers
+
 from lizard_security.models import (
-    DataOwner, DataSet, UserGroup, PermissionMapper
-    )
-from django.contrib.contenttypes.models import ContentType
+    DataOwner,
+    DataSet,
+    PermissionMapper,
+    UserGroup,
+)
+
+from ddsc_core.models import (
+    Alarm,
+    Alarm_Active,
+    Alarm_Item,
+    Compartment,
+    Location,
+    LogicalGroup,
+    LogicalGroupEdge,
+    Manufacturer,
+    MeasuringDevice,
+    MeasuringMethod,
+    Parameter,
+    ProcessingMethod,
+    ReferenceFrame,
+    Source,
+    StatusCache,
+    Timeseries,
+    Unit,
+)
+
+from dikedata_api import fields
 
 
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
@@ -36,36 +51,42 @@ class ParameterSerializer(serializers.ModelSerializer):
 
 
 class CompartmentSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Compartment
         fields = ('id', 'code', 'description')
 
 
 class MeasuringDeviceSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = MeasuringDevice
         fields = ('id', 'code', 'description')
 
 
 class MeasuringMethodSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = MeasuringMethod
         fields = ('id', 'code', 'description')
 
 
 class ProcessingMethodSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = ProcessingMethod
         fields = ('id', 'code', 'description')
 
 
 class ReferenceFrameSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = ReferenceFrame
         fields = ('id', 'code', 'description')
 
 
 class UnitSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Unit
         fields = ('id', 'code', 'description')
@@ -87,68 +108,77 @@ class AquoRelatedSerializer(serializers.SlugRelatedField):
 
 
 class ParameterRelSerializer(AquoRelatedSerializer):
-    """
-    """
+
     class Meta:
         model = Parameter
         fields = ('id', 'code', 'description')
 
 
 class CompartmentRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = Compartment
         fields = ('id', 'code', 'description')
 
 
 class MeasuringDeviceRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = MeasuringDevice
         fields = ('id', 'code', 'description')
 
 
 class MeasuringMethodRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = MeasuringMethod
         fields = ('id', 'code', 'description')
 
 
 class ProcessingMethodRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = ProcessingMethod
         fields = ('id', 'code', 'description')
 
 
 class ReferenceFrameRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = ReferenceFrame
         fields = ('id', 'code', 'description')
 
 
 class UnitRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = Unit
         fields = ('id', 'code', 'description')
 
 
 class UserListSerializer(BaseSerializer):
+
     class Meta:
         model = User
         fields = ('url', 'username', )
 
 
 class UserDetailSerializer(BaseSerializer):
+
     class Meta:
         model = User
         exclude = ('password', 'groups', 'user_permissions', )
 
 
 class UserGroupListSerializer(BaseSerializer):
+
     class Meta:
         model = UserGroup
         fields = ('id', 'url', 'name', )
 
 
 class UserGroupDetailSerializer(BaseSerializer):
+
     class Meta:
         model = UserGroup
 
@@ -170,12 +200,14 @@ class RoleDetailSerializer(BaseSerializer):
 
 
 class DataOwnerListSerializer(BaseSerializer):
+
     class Meta:
         model = DataOwner
         fields = ('id', 'url', 'name', )
 
 
 class DataOwnerDetailSerializer(BaseSerializer):
+
     class Meta:
         model = DataOwner
         fields = ('id', 'url', 'name', 'remarks', )
@@ -188,12 +220,14 @@ class DataOwnerRefSerializer(serializers.SlugRelatedField):
 
 
 class ManufacturerSerializer(BaseSerializer):
+
     class Meta:
         model = Manufacturer
         fields = ('code', 'name')
 
 
 class ManufacturerRefSerializer(serializers.SlugRelatedField):
+
     class Meta:
         model = Manufacturer
         fields = ('code', 'name')
@@ -239,7 +273,6 @@ class SourceRefSerializer(serializers.SlugRelatedField):
 
 
 class AlarmDetailSerializer(BaseSerializer):
-    # alarm = serializers.SerializerMethodField('get_alarm_type')
 
     class Meta:
         model = Alarm
@@ -269,7 +302,6 @@ class ContentObjectSerializer(serializers.Field):
 
 
 class AlarmItemDetailSerializer(BaseSerializer):
-
     comparision = fields.DictChoiceField(choices=Alarm_Item.COMPARISION_TYPE)
     logical_check = fields.DictChoiceField(choices=Alarm_Item.LOGIC_TYPES)
     value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
@@ -348,9 +380,7 @@ class LocationDetailSerializer(BaseSerializer):
     point_geometry = fields.GeometryPointField()
     srid = serializers.Field(source='get_srid')
     owner = DataOwnerRefSerializer(slug_field='name')
-
-    def save_object(self, obj, **kwargs):
-        obj.save_under(parent_pk=None)
+    icon_url = serializers.SerializerMethodField('get_icon_url')
 
     class Meta:
         model = Location
@@ -366,6 +396,7 @@ class LocationDetailSerializer(BaseSerializer):
             'relative_location',
             #'real_geometry',
             'owner',
+            'icon_url',
             'show_on_map',
             'created',
             'path',
@@ -380,6 +411,17 @@ class LocationDetailSerializer(BaseSerializer):
             'depth',
         )
 
+    def get_icon_url(self, obj):
+        if obj.icon_url:
+            # Custom icon
+            return obj.icon_url
+        else:
+            # Default icon
+            return "/app/images/marker-dam-3.png"
+
+    def save_object(self, obj, **kwargs):
+        obj.save_under(parent_pk=None)
+
 
 class LocationListSerializer(LocationDetailSerializer):
 
@@ -390,6 +432,7 @@ class LocationListSerializer(LocationDetailSerializer):
                   'uuid',
                   'name',
                   'owner',
+                  'icon_url',
                   'show_on_map',
                   'point_geometry',
                   'srid')
@@ -633,6 +676,7 @@ class DataSetDetailSerializer(BaseSerializer):
 
 
 class DataSetListSerializer(DataSetDetailSerializer):
+
     class Meta:
         model = DataSet
         fields = ('id', 'url', 'name', 'owner', )
@@ -642,15 +686,15 @@ class LogicalGroupParentRefSerializer(BaseSerializer):
     name = serializers.SerializerMethodField('get_name')
     parent_id = serializers.SerializerMethodField('get_parent_id')
 
+    class Meta:
+        model = LogicalGroupEdge
+        fields = ('id', 'parent', 'name', 'parent_id')
+
     def get_name(self, obj):
         return obj.parent.name
 
     def get_parent_id(self, obj):
         return obj.parent.id
-
-    class Meta:
-        model = LogicalGroupEdge
-        fields = ('id', 'parent', 'name', 'parent_id')
 
 
 class LogicalGroupDetailSerializer(BaseSerializer):
@@ -667,7 +711,6 @@ class LogicalGroupDetailSerializer(BaseSerializer):
 
 
 class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
-
     parents = fields.ManyHyperlinkedParents(
         many=True, view_name='logicalgroup-detail', slug_field='id',
         read_only=True)
@@ -678,7 +721,6 @@ class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
 
 
 class StatusCacheDetailSerializer(BaseSerializer):
-
     timeseries = TimeseriesSmallListSerializer()
 
     class Meta:
@@ -687,7 +729,6 @@ class StatusCacheDetailSerializer(BaseSerializer):
 
 
 class StatusCacheListSerializer(StatusCacheDetailSerializer):
-
     timeseries = TimeseriesSmallListSerializer()
 
     class Meta:
