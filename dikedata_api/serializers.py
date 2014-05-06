@@ -1,23 +1,42 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
+
 from __future__ import unicode_literals
 
-from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, Location, LogicalGroup, LogicalGroupEdge,
-                              Manufacturer, Timeseries, Source, StatusCache )
-from ddsc_core.models.aquo import Compartment
-from ddsc_core.models.aquo import MeasuringDevice
-from ddsc_core.models.aquo import MeasuringMethod
-from ddsc_core.models.aquo import Parameter
-from ddsc_core.models.aquo import ProcessingMethod
-from ddsc_core.models.aquo import ReferenceFrame
-from ddsc_core.models.aquo import Unit
-
-from dikedata_api import fields
-from django.contrib.auth.models import User, Group as Role
+from django.contrib.auth.models import Group as Role, User
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.utils import simplejson as json
+
 from rest_framework import serializers
-from lizard_security.models import DataOwner, DataSet, UserGroup, PermissionMapper
-from django.contrib.contenttypes.models import ContentType
+
+from lizard_security.models import (
+    DataOwner,
+    DataSet,
+    PermissionMapper,
+    UserGroup,
+)
+
+from ddsc_core.models import (
+    Alarm,
+    Alarm_Active,
+    Alarm_Item,
+    Compartment,
+    Location,
+    LogicalGroup,
+    LogicalGroupEdge,
+    Manufacturer,
+    MeasuringDevice,
+    MeasuringMethod,
+    Parameter,
+    ProcessingMethod,
+    ReferenceFrame,
+    Source,
+    StatusCache,
+    Timeseries,
+    Unit,
+)
+
+from dikedata_api import fields
 
 
 class BaseSerializer(serializers.HyperlinkedModelSerializer):
@@ -32,36 +51,42 @@ class ParameterSerializer(serializers.ModelSerializer):
 
 
 class CompartmentSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Compartment
         fields = ('id', 'code', 'description')
 
 
 class MeasuringDeviceSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = MeasuringDevice
         fields = ('id', 'code', 'description')
 
 
 class MeasuringMethodSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = MeasuringMethod
         fields = ('id', 'code', 'description')
 
 
 class ProcessingMethodSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = ProcessingMethod
         fields = ('id', 'code', 'description')
 
 
 class ReferenceFrameSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = ReferenceFrame
         fields = ('id', 'code', 'description')
 
 
 class UnitSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = Unit
         fields = ('id', 'code', 'description')
@@ -75,72 +100,85 @@ class AquoRelatedSerializer(serializers.SlugRelatedField):
 
         item = getattr(obj, field)
         if item:
-            return {'id': item.id, 'code': item.code, 'description': item.description}
+            return {
+                'id': item.id,
+                'code': item.code,
+                'description': item.description
+            }
 
 
 class ParameterRelSerializer(AquoRelatedSerializer):
-    """
-    """
+
     class Meta:
         model = Parameter
         fields = ('id', 'code', 'description')
 
 
 class CompartmentRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = Compartment
         fields = ('id', 'code', 'description')
 
 
 class MeasuringDeviceRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = MeasuringDevice
         fields = ('id', 'code', 'description')
 
 
 class MeasuringMethodRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = MeasuringMethod
         fields = ('id', 'code', 'description')
 
 
 class ProcessingMethodRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = ProcessingMethod
         fields = ('id', 'code', 'description')
 
 
 class ReferenceFrameRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = ReferenceFrame
         fields = ('id', 'code', 'description')
 
 
 class UnitRelSerializer(AquoRelatedSerializer):
+
     class Meta:
         model = Unit
         fields = ('id', 'code', 'description')
 
 
 class UserListSerializer(BaseSerializer):
+
     class Meta:
         model = User
         fields = ('url', 'username', )
 
 
 class UserDetailSerializer(BaseSerializer):
+
     class Meta:
         model = User
         exclude = ('password', 'groups', 'user_permissions', )
 
 
 class UserGroupListSerializer(BaseSerializer):
+
     class Meta:
         model = UserGroup
         fields = ('id', 'url', 'name', )
 
 
 class UserGroupDetailSerializer(BaseSerializer):
+
     class Meta:
         model = UserGroup
 
@@ -162,12 +200,14 @@ class RoleDetailSerializer(BaseSerializer):
 
 
 class DataOwnerListSerializer(BaseSerializer):
+
     class Meta:
         model = DataOwner
         fields = ('id', 'url', 'name', )
 
 
 class DataOwnerDetailSerializer(BaseSerializer):
+
     class Meta:
         model = DataOwner
         fields = ('id', 'url', 'name', 'remarks', )
@@ -180,12 +220,14 @@ class DataOwnerRefSerializer(serializers.SlugRelatedField):
 
 
 class ManufacturerSerializer(BaseSerializer):
+
     class Meta:
         model = Manufacturer
         fields = ('code', 'name')
 
 
 class ManufacturerRefSerializer(serializers.SlugRelatedField):
+
     class Meta:
         model = Manufacturer
         fields = ('code', 'name')
@@ -200,21 +242,29 @@ class SourceListSerializer(BaseSerializer):
 
     class Meta:
         model = Source
-        fields = ('id', 'uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = (
+            'id', 'uuid', 'url', 'name', 'owner', 'source_type',
+            'manufacturer', 'details', 'frequency', 'timeout'
+            )
 
 
 class SourceDetailSerializer(SourceListSerializer):
 
     class Meta:
         model = Source
-        fields = ('id', 'uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer', 'details', 'frequency', 'timeout')
+        fields = (
+            'id', 'uuid', 'url', 'name', 'owner', 'source_type',
+            'manufacturer', 'details', 'frequency', 'timeout'
+            )
 
 
 class SourceRefSerializer(serializers.SlugRelatedField):
 
     class Meta:
         model = Source
-        fields = ('uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer')
+        fields = (
+            'uuid', 'url', 'name', 'owner', 'source_type', 'manufacturer'
+            )
 
     def field_to_native(self, obj, field):
         item = getattr(obj, field)
@@ -223,7 +273,6 @@ class SourceRefSerializer(serializers.SlugRelatedField):
 
 
 class AlarmDetailSerializer(BaseSerializer):
-    # alarm = serializers.SerializerMethodField('get_alarm_type')
 
     class Meta:
         model = Alarm
@@ -253,7 +302,6 @@ class ContentObjectSerializer(serializers.Field):
 
 
 class AlarmItemDetailSerializer(BaseSerializer):
-
     comparision = fields.DictChoiceField(choices=Alarm_Item.COMPARISION_TYPE)
     logical_check = fields.DictChoiceField(choices=Alarm_Item.LOGIC_TYPES)
     value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
@@ -320,25 +368,6 @@ class Alarm_ActiveListSerializer(Alarm_ActiveDetailSerializer):
         model = Alarm_Active
 
 
-
-#
-# class SubLocationSerializer(SubSubLocationSerializer):
-#     sublocations = SubSubLocationSerializer(source='sublocations')
-#
-#     class Meta:
-#         model = Location
-#         fields = ('id',
-#                   'url',
-#                   'uuid',
-#                   'name',
-#                   'point_geometry',
-#                   'sublocations',)
-
-
-# class LocationListSerializer(SubLocationSerializer):
-#     sublocations = SubLocationSerializer(source='sublocations')
-
-
 class LocationDetailSerializer(BaseSerializer):
     url = serializers.HyperlinkedIdentityField(
         view_name='location-detail', slug_field='uuid')
@@ -351,9 +380,7 @@ class LocationDetailSerializer(BaseSerializer):
     point_geometry = fields.GeometryPointField()
     srid = serializers.Field(source='get_srid')
     owner = DataOwnerRefSerializer(slug_field='name')
-
-    def save_object(self, obj, **kwargs):
-        obj.save_under(parent_pk=None)
+    icon_url = serializers.SerializerMethodField('get_icon_url')
 
     class Meta:
         model = Location
@@ -369,6 +396,7 @@ class LocationDetailSerializer(BaseSerializer):
             'relative_location',
             #'real_geometry',
             'owner',
+            'icon_url',
             'show_on_map',
             'created',
             'path',
@@ -383,6 +411,17 @@ class LocationDetailSerializer(BaseSerializer):
             'depth',
         )
 
+    def get_icon_url(self, obj):
+        if obj.icon_url:
+            # Custom icon
+            return obj.icon_url
+        else:
+            # Default icon
+            return "/app/images/marker-dam-3.png"
+
+    def save_object(self, obj, **kwargs):
+        obj.save_under(parent_pk=None)
+
 
 class LocationListSerializer(LocationDetailSerializer):
 
@@ -393,6 +432,7 @@ class LocationListSerializer(LocationDetailSerializer):
                   'uuid',
                   'name',
                   'owner',
+                  'icon_url',
                   'show_on_map',
                   'point_geometry',
                   'srid')
@@ -473,7 +513,10 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'validate_diff_soft'
         )
         #depth = 1,
-        read_only = ('id', 'uuid', 'first_value_timestamp', 'latest_value_timestamp', 'latest_value', )
+        read_only = (
+            'id', 'uuid', 'first_value_timestamp', 'latest_value_timestamp',
+            'latest_value',
+            )
 
 
 class TimeseriesListSerializer(TimeseriesDetailSerializer):
@@ -483,8 +526,11 @@ class TimeseriesListSerializer(TimeseriesDetailSerializer):
 
     class Meta:
         model = Timeseries
-        fields = ('id', 'url', 'uuid', 'name', 'location', 'latest_value_timestamp', 'latest_value', 'events', 'value_type',
-                  'parameter', 'unit', 'owner', 'source')
+        fields = (
+            'id', 'url', 'uuid', 'name', 'location', 'latest_value_timestamp',
+            'latest_value', 'events', 'value_type', 'parameter', 'unit',
+            'owner', 'source'
+            )
         depth = 2
 
 
@@ -495,7 +541,10 @@ class TimeseriesSmallListSerializer(TimeseriesDetailSerializer):
 
     class Meta:
         model = Timeseries
-        fields = ('id', 'url', 'uuid', 'name', 'parameter', 'latest_value', 'value_type',)
+        fields = (
+            'id', 'url', 'uuid', 'name', 'parameter', 'latest_value',
+            'value_type',
+            )
         #depth = 2
 
 
@@ -563,7 +612,10 @@ class TimeseriesRefSerializer(serializers.HyperlinkedRelatedField):
     def field_to_native(self, obj, field):
         #get display value
 
-        return [{'url': self.to_native(t), 'name': t.name} for t in getattr(obj, field).all()]
+        return [
+            {'url': self.to_native(t), 'name': t.name}
+            for t in getattr(obj, field).all()
+        ]
 
 
 class RecursiveTimeseriesSerializer(serializers.HyperlinkedRelatedField):
@@ -574,7 +626,10 @@ class RecursiveTimeseriesSerializer(serializers.HyperlinkedRelatedField):
     def field_to_native(self, obj, field):
         #get display value
 
-        return [{'url': self.to_native(t), 'name': t.name} for t in obj.timeseries_r()]
+        return [
+            {'url': self.to_native(t), 'name': t.name}
+            for t in obj.timeseries_r()
+        ]
 
 
 class RoleSerializer(serializers.SlugRelatedField):
@@ -584,10 +639,6 @@ class RoleSerializer(serializers.SlugRelatedField):
 
 
 class PermissionMapperSerializer(BaseSerializer):
-    #permission_group = RoleSerializer(slug_field='pk')
-    #user_group = UserGroupSerializer(slug_field='pk')
-    #permission_group = serializers.HyperlinkedRelatedField(view_name='role-detail')
-    #user_group = serializers.HyperlinkedRelatedField(view_name='usergroup-detail')
     permission_group = serializers.PrimaryKeyRelatedField()
     user_group = serializers.PrimaryKeyRelatedField()
     data_set = serializers.HyperlinkedRelatedField(view_name='dataset-detail')
@@ -604,23 +655,28 @@ class PermissionMapperSerializer(BaseSerializer):
                 pm = PermissionMapper.objects.get(pk=pm_data['id'])
             else:
                 pm = PermissionMapper()
-            pm.permission_group = Role.objects.get(pk=pm_data['permission_group'])
+            pm.permission_group = Role.objects.get(
+                pk=pm_data['permission_group'])
             pm.user_group = UserGroup.objects.get(pk=pm_data['user_group'])
             permission_mappers.append(pm)
         into['permission_mappers'] = permission_mappers
 
 
 class DataSetDetailSerializer(BaseSerializer):
-    timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
+    timeseries = TimeseriesRefSerializer(
+        many=True, view_name='timeseries-detail', slug_field='uuid')
     owner = DataOwnerRefSerializer(slug_field='name')
     permission_mappers = PermissionMapperSerializer(many=True)
 
     class Meta:
         model = DataSet
-        fields = ('id', 'url', 'name', 'owner', 'timeseries', 'permission_mappers')
+        fields = (
+            'id', 'url', 'name', 'owner', 'timeseries', 'permission_mappers'
+            )
 
 
 class DataSetListSerializer(DataSetDetailSerializer):
+
     class Meta:
         model = DataSet
         fields = ('id', 'url', 'name', 'owner', )
@@ -630,28 +686,21 @@ class LogicalGroupParentRefSerializer(BaseSerializer):
     name = serializers.SerializerMethodField('get_name')
     parent_id = serializers.SerializerMethodField('get_parent_id')
 
+    class Meta:
+        model = LogicalGroupEdge
+        fields = ('id', 'parent', 'name', 'parent_id')
+
     def get_name(self, obj):
         return obj.parent.name
 
     def get_parent_id(self, obj):
         return obj.parent.id
 
-    class Meta:
-        model = LogicalGroupEdge
-        fields = ('id', 'parent', 'name', 'parent_id')
-
-    # def field_to_native(self, obj, field):
-    #     """
-    #         return dict representation of model
-    #     """
-    #     return [{'url': t.parent, 'name': t.parent.name} for t in getattr(obj, field).all()]
-
-
 
 class LogicalGroupDetailSerializer(BaseSerializer):
     id = serializers.Field('id')
-    #timeseries = RecursiveTimeseriesSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
-    timeseries = TimeseriesRefSerializer(many=True, view_name='timeseries-detail', slug_field='uuid')
+    timeseries = TimeseriesRefSerializer(
+        many=True, view_name='timeseries-detail', slug_field='uuid')
     parents = LogicalGroupParentRefSerializer(many=True, read_only=True)
     childs = fields.ManyHyperlinkedChilds(
         view_name='logicalgroup-detail', read_only=True)
@@ -662,9 +711,9 @@ class LogicalGroupDetailSerializer(BaseSerializer):
 
 
 class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
-
-    parents = fields.ManyHyperlinkedParents(many=True,
-        view_name='logicalgroup-detail', slug_field='id', read_only=True)
+    parents = fields.ManyHyperlinkedParents(
+        many=True, view_name='logicalgroup-detail', slug_field='id',
+        read_only=True)
 
     class Meta:
         model = LogicalGroup
@@ -672,7 +721,6 @@ class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
 
 
 class StatusCacheDetailSerializer(BaseSerializer):
-
     timeseries = TimeseriesSmallListSerializer()
 
     class Meta:
@@ -681,7 +729,6 @@ class StatusCacheDetailSerializer(BaseSerializer):
 
 
 class StatusCacheListSerializer(StatusCacheDetailSerializer):
-
     timeseries = TimeseriesSmallListSerializer()
 
     class Meta:
