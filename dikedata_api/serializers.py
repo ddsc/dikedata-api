@@ -36,6 +36,9 @@ from ddsc_core.models import (
     Unit,
 )
 
+from ddsc_site.models import Annotation
+from haystack.query import SearchQuerySet, SQ
+
 from dikedata_api import fields
 
 
@@ -381,6 +384,7 @@ class LocationDetailSerializer(BaseSerializer):
     srid = serializers.Field(source='get_srid')
     owner = DataOwnerRefSerializer(slug_field='name')
     icon_url = serializers.SerializerMethodField('get_icon_url')
+    annotations = serializers.SerializerMethodField('count_annotations')
 
     class Meta:
         model = Location
@@ -396,6 +400,7 @@ class LocationDetailSerializer(BaseSerializer):
             'relative_location',
             #'real_geometry',
             'owner',
+            'annotations',
             'icon_url',
             'show_on_map',
             'created',
@@ -412,18 +417,44 @@ class LocationDetailSerializer(BaseSerializer):
         )
 
     def get_icon_url(self, obj):
+        annotations = self.count_annotations(obj, with_timeseries=True)
         if obj.icon_url:
             # Custom icon
             return obj.icon_url
+        elif annotations > 0:
+            return "/app/images/marker-dam-3-annotations.png"
         else:
             # Default icon
             return "/app/images/marker-dam-3.png"
+
+    def count_annotations(self, obj, with_timeseries=None):
+        sqs = SearchQuerySet().models(Annotation)
+        if with_timeseries:
+            sq = SQ()
+            sq.add(SQ(
+                the_model_name__exact='location',
+                the_model_pk__exact=obj.pk
+                ), SQ.OR)
+            for timeseries in obj.timeseries.all():
+                sq.add(
+                    SQ(the_model_name__exact='timeseries',
+                        the_model_pk__exact=timeseries.pk),
+                    SQ.OR)
+            sqs = sqs.filter(sq)
+        else:
+            sqs = sqs.filter(
+                the_model_name__exact='location',
+                the_model_pk__exact=obj.pk
+                )
+        count = sqs.count()
+        return count
 
     def save_object(self, obj, **kwargs):
         obj.save_under(parent_pk=None)
 
 
 class LocationListSerializer(LocationDetailSerializer):
+    annotations = serializers.SerializerMethodField('count_annotations')
 
     class Meta:
         model = Location
@@ -431,8 +462,10 @@ class LocationListSerializer(LocationDetailSerializer):
                   'url',
                   'uuid',
                   'name',
+                  'annotations',
                   'owner',
                   'icon_url',
+                  'annotations',
                   'show_on_map',
                   'point_geometry',
                   'srid')
@@ -479,6 +512,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
     measuring_device = MeasuringDeviceRelSerializer(slug_field='code')
     measuring_method = MeasuringMethodRelSerializer(slug_field='code')
     processing_method = ProcessingMethodRelSerializer(slug_field='code')
+    annotations = serializers.SerializerMethodField('count_annotations')
 
     class Meta:
         model = Timeseries
@@ -494,6 +528,7 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'name',
             'description',
             'value_type',
+            'annotations',
             'source',
             'owner',
             'first_value_timestamp',
@@ -518,10 +553,21 @@ class TimeseriesDetailSerializer(BaseSerializer):
             'latest_value',
             )
 
+    def count_annotations(self, obj):
+        sqs = SearchQuerySet().models(Annotation)
+        sqs = sqs.filter(
+            the_model_name__exact='timeseries',
+            the_model_pk__exact=obj.pk
+            )
+        count = sqs.count()
+        return count
+
 
 class TimeseriesListSerializer(TimeseriesDetailSerializer):
     unit = serializers.SlugRelatedField(slug_field='code')
     parameter = serializers.SlugRelatedField(slug_field='code')
+    annotations = serializers.SerializerMethodField('count_annotations')
+
     #location = fields.RelatedField(model_field='uuid')
 
     class Meta:
@@ -529,9 +575,19 @@ class TimeseriesListSerializer(TimeseriesDetailSerializer):
         fields = (
             'id', 'url', 'uuid', 'name', 'location', 'latest_value_timestamp',
             'latest_value', 'events', 'value_type', 'parameter', 'unit',
-            'owner', 'source'
+            'annotations', 'owner', 'source'
             )
         depth = 2
+
+    def count_annotations(self, obj):
+        sqs = SearchQuerySet().models(Annotation)
+        sqs = sqs.filter(
+            the_model_name__exact='timeseries',
+            the_model_pk__exact=obj.pk
+            )
+        count = sqs.count()
+        return count
+
 
 
 class TimeseriesSmallListSerializer(TimeseriesDetailSerializer):
