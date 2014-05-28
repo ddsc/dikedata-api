@@ -718,9 +718,15 @@ class EventList(BaseEventView):
             timer_get_events = datetime.now() - timer_start
             response = self.format_flot(request, ts, df, start, end, timer_get_events=timer_get_events)
             if len(df) == 0:
+                # look at db for latest value
+                if ts.latest_value_timestamp is not None:
+                    ts_start = ts.latest_value_timestamp - (end - start)
+                else:
+                    ts_start = start
+                ts_end = ts.latest_value_timestamp
                 df = ts.get_events(
-                    start=None,
-                    end=None,
+                    start=ts_start,
+                    end=ts_end,
                     filter=filter,
                     ignore_rejected=ignore_rejected)
                 response = self.format_flot(request, ts, df, start, end)
