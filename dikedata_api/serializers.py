@@ -307,11 +307,12 @@ class AlarmItemDetailSerializer(BaseSerializer):
     value_type = fields.DictChoiceField(choices=Alarm_Item.VALUE_TYPE)
     alarm_type = ModelRefSerializer(slug_field='name')
     alarm = AlarmSettingRefSerializer(slug_field='id')
+    # uuid = serializers.SerializerMethodField('get_uuid')
     content_object_name = ContentObjectSerializer()
 
     class Meta:
         model = Alarm_Item
-        exclude = ('alarm', )
+        # exclude = ('alarm', )
         #read_only_fields = ('content_object_name', )
 
 
@@ -356,10 +357,23 @@ class AlarmSettingListSerializer(AlarmSettingDetailSerializer):
 
 class Alarm_ActiveDetailSerializer(BaseSerializer):
     alarm = AlarmSettingListSerializer()
+    # two times a query to same object.. any way to optimize this?
+    related_type = serializers.SerializerMethodField('get_type')
+    related_uuid = serializers.SerializerMethodField('get_uuid')
 
     class Meta:
         model = Alarm_Active
         depth = 1
+
+    def get_uuid(self, obj):
+        alarm_item = obj.alarm.alarm_item_set.all()[0]
+        if (alarm_item.alarm_type.name == 'timeseries' or
+                alarm_item.alarm_type.name == 'location'):
+            return alarm_item.content_object.uuid
+
+    def get_type(self, obj):
+        alarm_item = obj.alarm.alarm_item_set.all()[0]
+        return alarm_item.alarm_type.name
 
 
 class Alarm_ActiveListSerializer(Alarm_ActiveDetailSerializer):
