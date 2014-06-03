@@ -444,14 +444,15 @@ class LocationSearch(APIView):
             sqs = sqs.filter_or(name__startswith=query)
 
             qs = []
+            locations = []
             for item in sqs:
                 location = item.object.location
-                if (location not in qs and 
+                if (location not in locations and
                         (location.owner == None or 
                         self.request.user in location.owner.data_managers.all() or
                         self.request.user.is_superuser)):
                     location_json = serializers.LocationListSerializer(location).data
-                    # import ipdb;ipdb.set_trace()
+                    locations.append(location)
                     location_json['geocode'] = False
                     qs.append(location_json)
 
@@ -475,7 +476,6 @@ class LocationSearch(APIView):
                     }
 
                     qs.append(result)
-
         return Response(qs, status=status.HTTP_200_OK)
 
 
@@ -718,9 +718,15 @@ class EventList(BaseEventView):
             timer_get_events = datetime.now() - timer_start
             response = self.format_flot(request, ts, df, start, end, timer_get_events=timer_get_events)
             if len(df) == 0:
+                # look at db for latest value
+                if ts.latest_value_timestamp is not None:
+                    ts_start = ts.latest_value_timestamp - (end - start)
+                else:
+                    ts_start = start
+                ts_end = ts.latest_value_timestamp
                 df = ts.get_events(
-                    start=None,
-                    end=None,
+                    start=ts_start,
+                    end=ts_end,
                     filter=filter,
                     ignore_rejected=ignore_rejected)
                 response = self.format_flot(request, ts, df, start, end)
