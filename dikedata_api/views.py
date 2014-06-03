@@ -444,14 +444,15 @@ class LocationSearch(APIView):
             sqs = sqs.filter_or(name__startswith=query)
 
             qs = []
+            locations = []
             for item in sqs:
                 location = item.object.location
-                if (location not in qs and 
+                if (location not in locations and
                         (location.owner == None or 
                         self.request.user in location.owner.data_managers.all() or
                         self.request.user.is_superuser)):
                     location_json = serializers.LocationListSerializer(location).data
-                    # import ipdb;ipdb.set_trace()
+                    locations.append(location)
                     location_json['geocode'] = False
                     qs.append(location_json)
 
@@ -475,7 +476,6 @@ class LocationSearch(APIView):
                     }
 
                     qs.append(result)
-
         return Response(qs, status=status.HTTP_200_OK)
 
 
