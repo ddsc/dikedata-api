@@ -3,22 +3,20 @@ from __future__ import unicode_literals
 
 from datetime import datetime
 import calendar
+import json
 import logging
 import mimetypes
-import time
-import json
-import requests
 import numpy as np
+import requests
+import time
+import urlparse
 
 from django.conf import settings
-from django.contrib.auth import authenticate, login
-from django.contrib.auth.decorators import permission_required
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
-from django.db.models import F, Sum
+from django.db.models import Sum
 from django.http import Http404, HttpResponse
-from django.utils.decorators import method_decorator
 from django.db.models import Q
 
 from rest_framework import exceptions as ex, generics
@@ -34,9 +32,9 @@ from rest_framework.request import clone_request
 from haystack.query import SearchQuerySet
 
 
-from tls import TLSRequestMiddleware
-
-from lizard_security.models import DataSet, DataOwner, UserGroup, PermissionMapper
+from lizard_security.models import (
+    DataSet, DataOwner, UserGroup, PermissionMapper
+)
 
 from ddsc_core.auth import PERMISSION_CHANGE
 from ddsc_core.models import (Alarm, Alarm_Active, Alarm_Item, IdMapping,
@@ -52,7 +50,7 @@ from ddsc_core.models.aquo import Unit
 
 from dikedata_api import mixins, serializers
 from dikedata_api.parsers import CSVParser
-from dikedata_api.douglas_peucker import decimate, decimate_2d, decimate_until
+from dikedata_api.douglas_peucker import decimate_until
 from dikedata_api.renderers import CSVRenderer
 
 from tslib.readers import ListReader
@@ -60,17 +58,21 @@ from tslib.readers import ListReader
 logger = logging.getLogger(__name__)
 
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
-COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ' # supports milliseconds
+COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ'  # supports milliseconds
 FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%S.%fZ'
+GEOSERVER_FORMAT = '%Y-%m-%dT%H%M%SZ'  # used in geoserver by Fugro
 
 mimetypes.init()
 
-
-
 BOOL_LOOKUPS = ("isnull",)
 INT_LOOKUPS = ("year", "month", "day", "week_day",)
-STR_LOOKUPS = ("contains", "icontains", "startswith", "istartswith", "endswith", "iendswith", "search", "regex", "iregex",)
-ALL_LOOKUPS = BOOL_LOOKUPS + INT_LOOKUPS + STR_LOOKUPS + ("exact", "iexact", "gt", "gte", "lt", "lte",)
+STR_LOOKUPS = (
+    "contains", "icontains", "startswith", "istartswith", "endswith",
+    "iendswith", "search", "regex", "iregex",
+)
+ALL_LOOKUPS = BOOL_LOOKUPS + INT_LOOKUPS + STR_LOOKUPS + (
+    "exact", "iexact", "gt", "gte", "lt", "lte",
+)
 
 
 class InvalidKey(ParseError):
@@ -734,20 +736,52 @@ class EventList(BaseEventView):
 
     @staticmethod
     def format_default(request, ts, df):
-        if ts.is_file():
+        if (
+            ts.is_file() and ts.value_type ==
+            Timeseries.ValueType.GEO_REMOTE_SENSING
+        ):
+            # GeoTIFFs are published as WMS via GeoServer. Our API cannot
+            # provide clients with a GetMap request URL here, because we
+            # don't have a bbox at this point. We can, however, return
+            # the layer URLs, which can be used by clients to build
+            # WMS URLs.
+
+            # TODO: the uuid not remote_id should be used.
+            # Wating for Shaoqing to fix this...
+            try:
+                name = ts.idmapping_set.all()[0].remote_id
+            except:
+                name = ts.uuid
+
+            url = urlparse.urljoin(
+                settings.GEOSERVER_REST_ENDPOINT,
+                "layers/{}_{{}}.json".format(name)
+            )
+
             events = [
-                dict([('datetime', timestamp.strftime(COLNAME_FORMAT_MS)),
-                    ('value', reverse('event-detail',
-                    args=[ts.uuid, timestamp.strftime(FILENAME_FORMAT)],
-                    request=request))])
-                for timestamp, row in df.iterrows()
+                dict([
+                    ('datetime', timestamp.strftime(COLNAME_FORMAT_MS)),
+                    ('value', reverse('event-detail', args=[
+                        ts.uuid, timestamp.strftime(FILENAME_FORMAT)],
+                        request=request)),
+                    ('layer', url.format(timestamp.strftime(GEOSERVER_FORMAT)))
+                ]) for timestamp, row in df.iterrows()
+            ]
+        elif ts.is_file():
+            events = [
+                dict([
+                    ('datetime', timestamp.strftime(COLNAME_FORMAT_MS)),
+                    ('value', reverse('event-detail', args=[
+                        ts.uuid, timestamp.strftime(FILENAME_FORMAT)],
+                        request=request))
+                ]) for timestamp, row in df.iterrows()
             ]
         else:
             events = [
-                dict([('datetime', timestamp.strftime(COLNAME_FORMAT_MS))] +
+                dict(
+                    [('datetime', timestamp.strftime(COLNAME_FORMAT_MS))] +
                     [(colname, row[i]) for i, colname in enumerate(df.columns)]
-                )
-                for timestamp, row in df.iterrows()
+                ) for timestamp, row in df.iterrows()
             ]
         return events
 
