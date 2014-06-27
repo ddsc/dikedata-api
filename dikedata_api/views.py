@@ -9,9 +9,7 @@ import mimetypes
 import numpy as np
 import requests
 import time
-import urlparse
 
-from django.conf import settings
 from django.contrib.auth.models import User, Group as Role
 from django.core.exceptions import ValidationError
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
@@ -742,9 +740,9 @@ class EventList(BaseEventView):
         ):
             # GeoTIFFs are published as WMS via GeoServer. Our API cannot
             # provide clients with a GetMap request URL here, because we
-            # don't have a bbox at this point. We can, however, return
-            # the layer URLs, which can be used by clients to build
-            # WMS URLs.
+            # don't have a bbox at this point. Return workspace:layer
+            # for convenience. We don't even need that for it can
+            # be deduced from datetime and/or value?
 
             # TODO: the uuid not remote_id should be used.
             # Wating for Shaoqing to fix this...
@@ -753,10 +751,8 @@ class EventList(BaseEventView):
             except:
                 name = ts.uuid
 
-            url = urlparse.urljoin(
-                settings.GEOSERVER_REST_ENDPOINT,
-                "layers/{}_{{}}.json".format(name)
-            )
+            layer = "{workspace}:/{layer}_{{}}".format(
+                workspace="ddsc", layer=name)
 
             events = [
                 dict([
@@ -764,7 +760,8 @@ class EventList(BaseEventView):
                     ('value', reverse('event-detail', args=[
                         ts.uuid, timestamp.strftime(FILENAME_FORMAT)],
                         request=request)),
-                    ('layer', url.format(timestamp.strftime(GEOSERVER_FORMAT)))
+                    ('layer', layer.format(
+                        timestamp.strftime(GEOSERVER_FORMAT)))
                 ]) for timestamp, row in df.iterrows()
             ]
         elif ts.is_file():
