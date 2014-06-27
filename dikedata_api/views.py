@@ -751,7 +751,7 @@ class EventList(BaseEventView):
             except:
                 name = ts.uuid
 
-            layer = "{workspace}:/{layer}_{{}}".format(
+            layer = "{workspace}:{layer}_{{}}".format(
                 workspace="ddsc", layer=name)
 
             events = [
