@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 COLNAME_FORMAT = '%Y-%m-%dT%H:%M:%SZ'
 COLNAME_FORMAT_MS = '%Y-%m-%dT%H:%M:%S.%fZ'  # supports milliseconds
 FILENAME_FORMAT = '%Y-%m-%dT%H.%M.%S.%fZ'
-GEOSERVER_FORMAT = '%Y-%m-%dT%H%M%SZ'  # used in geoserver by Fugro
+GEOSERVER_FORMAT = COLNAME_FORMAT  # used in geoserver
 
 mimetypes.init()
 
@@ -744,15 +744,11 @@ class EventList(BaseEventView):
             # for convenience. We don't even need that for it can
             # be deduced from datetime and/or value?
 
-            # TODO: the uuid not remote_id should be used.
-            # Wating for Shaoqing to fix this...
-            try:
-                name = ts.idmapping_set.all()[0].remote_id
-            except:
-                name = ts.uuid
+            # The uuid not remote_id is used, because the latter
+            # is not guaranteed to be unique across suppliers.
 
             layer = "{workspace}:{layer}_{{}}".format(
-                workspace="ddsc", layer=name)
+                workspace="ddsc", layer=ts.uuid)
 
             events = [
                 dict([
