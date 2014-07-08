@@ -547,6 +547,23 @@ class TimeseriesDetail(APIDetailView):
         return qs.distinct()
 
 
+class TimeseriesBehind(TimeseriesList):
+    """Return all timeseries that are late.
+
+    Frequency is in seconds. For example, a frequency of 86400 means that the
+    latest_value_timestamp of a timeseries should be no older than 1 day.
+
+    """
+
+    def get_queryset(self):
+        qs = super(TimeseriesBehind, self).get_queryset()
+        # NB: without the filter on `frequency`, Django does not understand
+        # the `where` clause, because this column is in a related table.
+        qs = qs.filter(source__frequency__isnull=False).extra(where=[
+            "latest_value_timestamp < now() - frequency * INTERVAL '1'"])
+        return qs
+
+
 class TimeseriesSearch(APIListView):
     model = Timeseries
     serializer_class = serializers.TimeseriesListSerializer
@@ -568,7 +585,6 @@ class TimeseriesSearch(APIListView):
                     timeseries.owner == self.request.user)):
                     qs.append(timeseries)
         return qs
-
 
 
 class BaseEventView(mixins.BaseMixin, mixins.PostListModelMixin, APIView):

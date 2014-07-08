@@ -37,7 +37,7 @@ from ddsc_core.models import (
 )
 
 from ddsc_site.models import Annotation
-from haystack.query import SearchQuerySet, SQ
+from haystack.query import SearchQuerySet
 
 from dikedata_api import fields
 
@@ -753,7 +753,6 @@ class StatusCacheDetailSerializer(BaseSerializer):
     related_uuid = serializers.SerializerMethodField('get_uuid')
     timeseries = TimeseriesSmallListSerializer()
 
-
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )
@@ -767,6 +766,7 @@ class StatusCacheDetailSerializer(BaseSerializer):
     def get_type(self, obj):
         alarm_item = obj.alarm.alarm_item_set.all()[0]
         return alarm_item.alarm_type.name
+
 
 class StatusCacheListSerializer(StatusCacheDetailSerializer):
     timeseries = TimeseriesSmallListSerializer()
