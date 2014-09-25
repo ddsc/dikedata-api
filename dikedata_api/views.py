@@ -385,7 +385,15 @@ class LocationList(APIListView):
         qs = super(LocationList, self).get_queryset()
 
         if not self.request.user.is_authenticated():
-            qs = self.model.objects.filter(timeseries__owner=None)
+            # There is much wrong with the query below. It performs a LEFT
+            # OUTER JOIN, so will also return locations that don't have
+            # any timeseries, which is not very useful. Moreover, it
+            # does not return a unique set of Locations. Also, the
+            # timeseries endpoint is inaccessible to unauthenticated
+            # users, so even a correct version isn't of much use at
+            # the moment. For that reason, return an EmptyQuerySet.
+            ##qs = self.model.objects.filter(timeseries__owner=None)
+            qs = self.model.objects.none()
         elif self.request.user.is_superuser:
             qs = qs
         elif self.request.QUERY_PARAMS.get('management', False):
