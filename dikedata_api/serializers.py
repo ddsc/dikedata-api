@@ -748,24 +748,11 @@ class LogicalGroupListSerializer(LogicalGroupDetailSerializer):
 
 
 class StatusCacheDetailSerializer(BaseSerializer):
-    # two times a query to same object.. any way to optimize this?
-    related_type = serializers.SerializerMethodField('get_type')
-    related_uuid = serializers.SerializerMethodField('get_uuid')
     timeseries = TimeseriesSmallListSerializer()
 
     class Meta:
         model = StatusCache
         #exclude = ('timeseries', )
-
-    def get_uuid(self, obj):
-        alarm_item = obj.alarm.alarm_item_set.all()[0]
-        if (alarm_item.alarm_type.name == 'timeseries' or
-                alarm_item.alarm_type.name == 'location'):
-            return alarm_item.content_object.uuid
-
-    def get_type(self, obj):
-        alarm_item = obj.alarm.alarm_item_set.all()[0]
-        return alarm_item.alarm_type.name
 
 
 class StatusCacheListSerializer(StatusCacheDetailSerializer):
