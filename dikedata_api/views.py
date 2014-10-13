@@ -438,15 +438,11 @@ class LocationSearch(APIView):
             qs = []
         else:
             query = self.request.QUERY_PARAMS.get('q', None)
-            sqs = SearchQuerySet().models(Timeseries).filter(
-                content__startswith=query)
-            sqs = sqs.filter_or(location_name__startswith=query)
-            sqs = sqs.filter_or(name__startswith=query)
+            sqs = Location.objects.filter(name__icontains=query)
 
             qs = []
             locations = []
-            for item in sqs:
-                location = item.object.location
+            for location in sqs:
                 if (location not in locations and
                         (location.owner == None or 
                         self.request.user in location.owner.data_managers.all() or
