@@ -693,7 +693,7 @@ class EventList(BaseEventView):
         if format == 'csv':
             # in case of csv return a dataframe and let the renderer handle it
             response = ts.get_events(start=start, end=end, filter=filter)
-            headers['Content-Disposition'] = 'attachment; filename=%s-%s.csv' \
+            headers['Content-Disposition'] = "attachment; filename='%s-%s.csv'" \
                 % (uuid, sanitize_filename(ts.name))
         elif eventsformat is None:
             df = ts.get_events(start=start, end=end, filter=filter, ignore_rejected=ignore_rejected)
