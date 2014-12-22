@@ -1,6 +1,8 @@
 # (c) Nelen & Schuurmans.  MIT licensed, see LICENSE.rst.
 from __future__ import unicode_literals
 
+import math
+
 from django.conf import settings
 from django.contrib.gis.geos import Point
 from rest_framework import fields, serializers
@@ -69,14 +71,27 @@ class ManyHyperlinkedChilds(serializers.HyperlinkedRelatedField):
 
 
 class LatestValue(serializers.HyperlinkedIdentityField):
+
     def field_to_native(self, obj, field_name):
+
         if obj.is_file():
             latest_value = obj.latest_value_file()
             if latest_value:
-                return reverse('event-detail', args=[obj.uuid, latest_value],
+                return reverse(
+                    'event-detail', args=[obj.uuid, latest_value],
                     request=self.context['request'])
             return None
-        return obj.latest_value()
+
+        # Not a number, float("NaN"), is serialized to NaN (without quotes),
+        # which is not valid JSON. None, on the other hand, is serialized
+        # to null (without quotes), which is valid JSON and does not
+        # choke client-side parsers.
+
+        latest_value = obj.latest_value()
+        if isinstance(latest_value, float) and math.isnan(latest_value):
+            return None
+        else:
+            return latest_value
 
 
 class OpenDAPLink(serializers.Field):
