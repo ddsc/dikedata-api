@@ -837,6 +837,9 @@ class EventList(BaseEventView):
         timer_douglas_peucker = None
         timer_zip = None
 
+        # Drop NaN values. (Recent pandas versions support inplace drop.)
+        df = df.dropna(subset=["value"])
+
         if len(df) > 0:
             def to_js_timestamp(dt):
                 # Both are passed directly to Javascript's Date constructor.
