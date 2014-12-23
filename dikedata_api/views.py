@@ -800,6 +800,11 @@ class EventList(BaseEventView):
 
     @staticmethod
     def format_flot_scatter(request, df_xaxis, df_yaxis, ts, other_ts, start, end):
+
+        # Drop NaN values. (Recent pandas versions support inplace drop.)
+        df_xaxis = df_xaxis.dropna(subset=["value"])
+        df_yaxis = df_yaxis.dropna(subset=["value"])
+
         if len(df_xaxis) > 0 and len(df_yaxis) > 0:
             data = zip(df_xaxis['value'].values, df_yaxis['value'].values)
         else:
