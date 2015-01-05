@@ -396,7 +396,7 @@ class LocationDetailSerializer(BaseSerializer):
     point_geometry = fields.GeometryPointField()
     srid = serializers.Field(source='get_srid')
     owner = DataOwnerRefSerializer(slug_field='name')
-    icon_url = serializers.SerializerMethodField('get_icon_url')
+    #icon_url = serializers.SerializerMethodField('get_icon_url')
 
     class Meta:
         model = Location

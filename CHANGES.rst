@@ -7,6 +7,8 @@ Changelog of dikedata-api
 
 - Make dikedata-api compatible with Django 1.5.4.
 
+- Remove icon_url method field from LocationDetailSerializer to use the model field due write action.
+
 
 0.1 (2012-11-16)
 ----------------
