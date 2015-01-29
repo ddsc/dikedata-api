@@ -314,7 +314,7 @@ class AlarmItemDetailSerializer(BaseSerializer):
 
     class Meta:
         model = Alarm_Item
-        # exclude = ('alarm', )
+        exclude = ('alarm', )
         #read_only_fields = ('content_object_name', )
 
 
